@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+data/cpue.csv
+data/lfreq.csv
+data/specimen.csv
+data/haul_locs_2025.RDS
+data/goa_strata_2025.gpkg
