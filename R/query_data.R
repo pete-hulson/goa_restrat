@@ -37,16 +37,12 @@ query_data <- function(species,
                   stratum,
                   hauljoin,
                   latitude_dd_start,
-                  latitude_dd_end,
                   longitude_dd_start,
-                  longitude_dd_end,
                   cpue_nokm2,
                   cpue_kgkm2) %>% 
     dplyr::filter(survey_definition_id == 47,
                   species_code %in% species,
                   year >= 1990) %>% 
-    dplyr::mutate(lat_mid = (latitude_dd_start + latitude_dd_end) / 2,
-                  long_mid = (longitude_dd_start + longitude_dd_end) / 2) %>% 
     dplyr::select(year,
                   species_code,
                   stratum,
@@ -54,8 +50,8 @@ query_data <- function(species,
                   survey = survey_definition_id,
                   numcpue = cpue_nokm2,
                   wtcpue = cpue_kgkm2,
-                  lat_mid,
-                  long_mid) %>% 
+                  lat_st = latitude_dd_start,
+                  long_st = longitude_dd_start) %>% 
     dplyr::collect() -> cpue
   
   # get gap_products catch
@@ -71,9 +67,7 @@ query_data <- function(species,
                   stratum,
                   hauljoin,
                   latitude_dd_start,
-                  latitude_dd_end,
                   longitude_dd_start,
-                  longitude_dd_end,
                   distance_fished_km,
                   net_width_m,
                   count,
@@ -81,17 +75,15 @@ query_data <- function(species,
     dplyr::filter(survey_definition_id == 47,
                   species_code %in% species,
                   year >= 1990) %>% 
-    dplyr::mutate(lat_mid = (latitude_dd_start + latitude_dd_end) / 2,
-                  long_mid = (longitude_dd_start + longitude_dd_end) / 2,
-                  numcpue = count / (distance_fished_km * (0.001 * net_width_m)),
+    dplyr::mutate(numcpue = count / (distance_fished_km * (0.001 * net_width_m)),
                   wtcpue = weight_kg / (distance_fished_km * (0.001 * net_width_m))) %>% 
     dplyr::select(year,
                   survey = survey_definition_id,
                   species_code,
                   stratum,
                   hauljoin,
-                  lat_mid,
-                  long_mid,
+                  lat_st = latitude_dd_start,
+                  long_st = longitude_dd_start,
                   numcpue,
                   wtcpue) %>% 
     dplyr::collect() -> cpue_calc
@@ -179,18 +171,14 @@ query_data <- function(species,
                   stratum,
                   hauljoin,
                   latitude_dd_start,
-                  latitude_dd_end,
-                  longitude_dd_start,
-                  longitude_dd_end) %>% 
+                  longitude_dd_start) %>% 
     dplyr::filter(survey_definition_id == 47) %>% 
-    dplyr::mutate(lat_mid = (latitude_dd_start + latitude_dd_end) / 2,
-                  long_mid = (longitude_dd_start + longitude_dd_end) / 2) %>% 
     dplyr::select(year,
                   survey = survey_definition_id,
                   stratum,
                   hauljoin,
-                  lat_mid,
-                  long_mid) %>% 
+                  lat_st = latitude_dd_start,
+                  long_st = longitude_dd_start) %>% 
     dplyr::collect() %>% 
     vroom::vroom_write(here::here('data', "haul.csv"), 
                        delim = ',') -> haul
@@ -212,17 +200,13 @@ query_data <- function(species,
                     stratum,
                     hauljoin,
                     latitude_dd_start,
-                    latitude_dd_end,
                     longitude_dd_start,
-                    longitude_dd_end,
                     sex,
                     length_mm,
                     frequency) %>% 
       dplyr::filter(survey_definition_id == 47,
                     species_code %in% species,
                     year >= 1990) %>% 
-      dplyr::mutate(lat_mid = (latitude_dd_start + latitude_dd_end) / 2,
-                    long_mid = (longitude_dd_start + longitude_dd_end) / 2) %>% 
       dplyr::select(year, 
                     survey = survey_definition_id,
                     species_code,
@@ -231,8 +215,8 @@ query_data <- function(species,
                     sex,
                     length = length_mm,
                     frequency,
-                    lat_mid,
-                    long_mid) %>% 
+                    lat_st = latitude_dd_start,
+                    long_st = longitude_dd_start) %>% 
       dplyr::collect() %>% 
       vroom::vroom_write(here::here('data', "lfreq.csv"), 
                          delim = ',') -> lfreq
@@ -253,17 +237,13 @@ query_data <- function(species,
                     stratum,
                     hauljoin,
                     latitude_dd_start,
-                    latitude_dd_end,
                     longitude_dd_start,
-                    longitude_dd_end,
                     sex,
                     length_mm,
                     age) %>% 
       dplyr::filter(survey_definition_id == 47,
                     species_code %in% species,
                     year >= 1990) %>% 
-      dplyr::mutate(lat_mid = (latitude_dd_start + latitude_dd_end) / 2,
-                    long_mid = (longitude_dd_start + longitude_dd_end) / 2) %>% 
       dplyr::select(year, 
                     survey = survey_definition_id,
                     species_code,
@@ -272,8 +252,8 @@ query_data <- function(species,
                     sex,
                     length = length_mm,
                     age,
-                    lat_mid,
-                    long_mid) %>% 
+                    lat_st = latitude_dd_start,
+                    long_st = longitude_dd_start) %>% 
       dplyr::collect() %>% 
       vroom::vroom_write(here::here('data', "specimen.csv"), 
                          delim = ',') -> specimen
