@@ -92,7 +92,7 @@ query_data <- function(species,
   tidytable::expand_grid(hauljoin = unique(cpue$hauljoin), species_code = species) %>% 
     tidytable::left_join(cpue %>% 
                            tidytable::select(-species_code, -numcpue, -wtcpue) %>% 
-                           tidytable::slice_head(n = 1, .by = c(year, survey, stratum, lat_mid, long_mid)), .by = hauljoin) %>% 
+                           tidytable::slice_head(n = 1, .by = c(year, survey, stratum, lat_st, long_st)), .by = hauljoin) %>% 
     tidytable::left_join(cpue_calc %>% 
                            tidytable::replace_na(list(numcpue = -1)) %>% 
                            tidytable::replace_na(list(wtcpue = -1))) %>% 
@@ -143,20 +143,6 @@ query_data <- function(species,
     vroom::vroom_write(here::here('data', "strata.csv"), 
                        delim = ',') -> strata
   
-  # species names ----
-  
-  cat(paste0("pulling species info...\n"))
-  
-  dplyr::tbl(conn, dplyr::sql('gap_products.akfin_taxonomic_classification')) %>% 
-    dplyr::rename_all(tolower) %>% 
-    dplyr::filter(species_code %in% species) %>% 
-    dplyr::select(species_code,
-                  species_name,
-                  common_name) %>% 
-    dplyr::collect() %>% 
-    vroom::vroom_write(here::here('data', "species.csv"), 
-                       delim = ',') -> species
-  
   # haul data ----
   # note: got this query from zack
   
@@ -182,6 +168,36 @@ query_data <- function(species,
     dplyr::collect() %>% 
     vroom::vroom_write(here::here('data', "haul.csv"), 
                        delim = ',') -> haul
+  
+  # computed index data ----
+  
+  cat(paste0("pulling index data...\n"))
+  
+  dplyr::tbl(conn, dplyr::sql('gap_products.akfin_biomass')) %>% 
+    dplyr::rename_all(tolower) %>% 
+    dplyr::filter(survey_definition_id == 47,
+                  area_id == 99903,
+                  year >= 1990,
+                  species_code %in% species) %>% 
+    dplyr::select(year, area_id, species_code, biomass_mt, biomass_var, population_count, population_var) %>% 
+    dplyr::collect() %>% 
+    vroom::vroom_write(here::here('data', "index.csv"), 
+                       delim = ',') -> index
+  
+  # species names ----
+  
+  cat(paste0("pulling species info...\n"))
+  
+  dplyr::tbl(conn, dplyr::sql('gap_products.akfin_taxonomic_classification')) %>% 
+    dplyr::rename_all(tolower) %>% 
+    dplyr::filter(species_code %in% species) %>% 
+    dplyr::select(species_code,
+                  species_name,
+                  common_name) %>% 
+    dplyr::collect() %>% 
+    vroom::vroom_write(here::here('data', "species_names.csv"), 
+                       delim = ',') -> species_names
+  
   
   if(isTRUE(pull_comp)){
     # length frequency data ----
@@ -266,12 +282,15 @@ query_data <- function(species,
                 specimen = tidytable::as_tidytable(specimen),
                 cpue = tidytable::as_tidytable(cpue),
                 strata = tidytable::as_tidytable(strata),
-                haul = tidytable::as_tidytable(haul))
+                haul = tidytable::as_tidytable(haul),
+                index = tidytable::as_tidytable(index))
   } else{
     data = list(cpue = tidytable::as_tidytable(cpue),
                 strata = tidytable::as_tidytable(strata),
-                haul = tidytable::as_tidytable(haul))
+                haul = tidytable::as_tidytable(haul),
+                index = tidytable::as_tidytable(index))
   }
+  saveRDS(data, here::here('data', 'data.rds'))
   
   data
 }
