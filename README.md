@@ -12,10 +12,10 @@ This is not a package yet, so, you will need to clone this repository (see these
 To evaluate the comparison between original and restratified indices for your stock please see this [script](/dev/run_restrat.R), which contains the workflow described above.
 Note that you will not be able to perform the second step without the necessary shapefile, but, you will be able to run these analyses so long as the 'data.rds' and 'new_haul.csv' files are contained within the 'data' folder after you've cloned this repository.
 Within the analyses [script](/dev/run_restrat.R) section 'plot comparison between restratified and og indices' there are examples for how to plot figures for your specific stock.
-You can either have a single species code (an example is provided for Pcod), or you can have multiple species codes (as would be the case for stock complexes, and example is provided for rougheye-blackspotted rockfish).
-There are two arguments you need to provide for the plot_restrat() function, the first is the spcies code, the second is a text string that defines the name of your stock (it can be whatever you want, but don't include spaces).
+You can either have a single species code (an example is provided for Pcod), or you can have multiple species codes (as would be the case for stock complexes, an example is provided for rougheye-blackspotted rockfish).
+There are two arguments you need to provide for the [plot_restrat()](/R/plot_restrat.R) function, the first is the species code, the second is a text string that defines the name of your stock (it can be whatever you want, but don't include spaces).
 
-What the plot_restrat() function will return are four plots:
+The [plot_restrat()](/R/plot_restrat.R) function will return four plots:
 1. The time-series comparison between the original biomass (with 95% CIs) and the point estimates for the restratified index
 2. The time-series comparison between the original population numbers (with 95% CIs) and the point estimates for the restratified index
 3. The percent difference between the original biomass and the point estimates for the restratified index (note that text denoting the survey's percent difference shown in bold font means that the restratified estimate for that year was outside the original 95% CIs)
@@ -26,8 +26,8 @@ The first, is that it will save the plots within the 'plots' folder.
 The second, is that it will plot these to your device (i.e., Rstudio) and you can toggle through the different plots.
 
 # Other important notes
-The primary functions that are performing this analysis are the restrat() and get_index() functions.
-The restrat() function uses the new strata shapefile to assign historical hauls within the new strata, the get_index() function then performs the design-based computations of biomass and numbers (that follows from the functions contained within the [gapindex](https://github.com/afsc-gap-products/gapindex) package).
+The primary functions that are performing this analysis are the [restrat()](/R/restrat.R) and [get_index()](/R/get_index.R) functions.
+The [restrat()](/R/restrat.R) function uses the new strata shapefile to assign historical hauls within the new strata, the [get_index()](/R/get_index.R) function then performs the design-based computations of biomass and numbers (that follows from the functions contained within the [gapindex](https://github.com/afsc-gap-products/gapindex) package).
 To troubleshoot and/or dig further these would be the functions to look at.
 
 
