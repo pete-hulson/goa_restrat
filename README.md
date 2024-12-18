@@ -13,7 +13,8 @@ To evaluate the comparison between original and restratified indices for your st
 Note that you will not be able to perform the second step without the necessary shapefile, but, you will be able to run these analyses so long as the 'data.rds' and 'new_haul.csv' files are contained within the 'data' folder after you've cloned this repository.
 Within the analyses [script](/dev/run_restrat.R) section 'plot comparison between restratified and og indices' there are examples for how to plot figures for your specific stock.
 You can either have a single species code (an example is provided for Pcod), or you can have multiple species codes (as would be the case for stock complexes, an example is provided for rougheye-blackspotted rockfish).
-There are two arguments you need to provide for the [plot_restrat()](/R/plot_restrat.R) function, the first is the species code, the second is a text string that defines the name of your stock (it can be whatever you want, but don't include spaces).
+If you don't have your stock's species code at the top of your head, have no fear, check out the [species names](/data/species_names.csv) datafile that contains all the Tier 3/4/5 species codes (with scientific and common names) that were run in this (if you don't see your species in here, please let me know and I'll add it in).
+There are two arguments you need to provide for the [plot_restrat()](/R/plot_restrat.R) function, the first is the species code, the second is a text string that defines the name of your stock (it can be whatever you want, but don't include spaces, so, something like 'POP' for 'Pacific ocean perch').
 
 The [plot_restrat()](/R/plot_restrat.R) function will return four plots:
 1. The time-series comparison between the original biomass (with 95% CIs) and the point estimates for the restratified index
