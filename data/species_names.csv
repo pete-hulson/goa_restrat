@@ -1,0 +1,51 @@
+species_code,species_name,common_name
+310,Squalus suckleyi,spiny dogfish
+400,Rajidae,skate unid.
+406,Bathyraja spinosissima,white skate
+410,Bathyraja abyssicola,deepsea skate
+420,Beringraja binoculata,big skate
+425,Beringraja inornata,California skate
+435,Bathyraja interrupta,Bering skate
+440,Beringraja rhina,longnose skate
+445,Amblyraja hyperborea,roughshoulder skate
+450,Beringraja stellulata,starry skate
+455,Bathyraja taranetzi,mud skate
+460,Bathyraja trachura,roughtail skate
+471,Arctoraja parmifera,Alaska skate
+472,Bathyraja aleutica,Aleutian skate
+475,Bathyraja lindbergi,Commander skate
+477,Bathyraja panthera,leopard skate
+480,Bathyraja maculata,whiteblotched skate
+483,Bathyraja mariposa,butterfly skate
+485,Bathyraja minispinosa,whitebrow skate
+490,Bathyraja smirnovi,golden skate
+495,Bathyraja violacea,Okhotsk skate
+10110,Atheresthes stomias,arrowtooth flounder
+10130,Hippoglossoides elassodon,flathead sole
+20510,Anoplopoma fimbria,sablefish
+10170,Parophrys vetulus,English sole
+10180,Microstomus pacificus,Dover sole
+10200,Glyptocephalus zachirus,rex sole
+10210,Limanda aspera,yellowfin sole
+10220,Platichthys stellatus,starry flounder
+10250,Psettichthys melanostictus,sand sole
+10261,Lepidopsetta polyxystra,northern rock sole
+21720,Gadus macrocephalus,Pacific cod
+21740,Gadus chalcogrammus,walleye pollock
+10262,Lepidopsetta bilineata,southern rock sole
+10270,Isopsetta isolepis,butter sole
+10285,Pleuronectes quadrituberculatus,Alaska plaice
+30020,Sebastolobus alascanus,shortspine thornyhead
+30420,Sebastes polyspinis,northern rockfish
+30430,Sebastes proriger,redstripe rockfish
+30475,Sebastes babcocki,redbanded rockfish
+30535,Sebastes variegatus,harlequin rockfish
+30560,Sebastes zacentrus,sharpchin rockfish
+30576,Sebastes borealis,shortraker rockfish
+30050,NA,rougheye and blackspotted rockfish unid.
+30051,Sebastes aleutianus,rougheye rockfish
+30052,Sebastes melanostictus,blackspotted rockfish
+30060,Sebastes alutus,Pacific ocean perch
+30100,Sebastes brevispinis,silvergray rockfish
+30150,NA,dusky and dark rockfishes unid.
+30152,Sebastes variabilis,dusky rockfish
