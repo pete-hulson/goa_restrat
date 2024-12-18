@@ -1,9 +1,9 @@
 #' Query data from GOA survey
 #' 
 #' @description
-#' Function that connects to AKFIN database (using afscdata package) and pulls catch per-unit-effort (cpue), 
-#' length frequency (lfreq), age-length specimen (specimen), survey strata (strata), and species information (species)
-#' data from the GAP_PRODUCTS tables
+#' Function that connects to AKFIN database (using afscdata package) and pulls catch per-unit-effort (cpue, in numbers and weight), 
+#' survey strata (strata), haul information (haul), design-based indices (index), species information (species_names),
+#' and if desired length frequency (lfreq) and age-length specimen (specimen) data from the GAP_PRODUCTS tables
 #' 
 #' @param species species_codes, i.e., c(10110, 21740)
 #' @param pull_comp boolean, if TRUE then pull necessary data to compute age/length composition (default = FALSE)
