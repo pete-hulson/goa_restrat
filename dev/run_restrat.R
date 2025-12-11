@@ -13,7 +13,7 @@ map(here::here("R", source_files), source)
 # set parameters for running stuff ----
 # query data? - if first time running, or if data.rds file not in data folder, you will need to change this to TRUE
 run_query = FALSE
-# run terra::extract function from shape file? - if first time running, or if new_haul.csv file not in data folder, you will need to change this to TRUE
+# run terra::extract function from shape file - if first time running, or if new_haul.csv file not in data folder, you will need to change this to TRUE
 run_terra = FALSE
 
 
@@ -23,7 +23,7 @@ run_terra = FALSE
 species_t3 = c(10110, 10130, 10180, 20510, 21720, 21740, 30060, 30420, 30050, 30051, 30052, 30150, 30152, 10261, 10262, 10200)
 
 # tier 5 species codes
-species_t5 = c(310, 400, 406, 410, 420, 425, 435, 440, 445, 450, 455, 460, 471, 472, 475, 477, 480, 483, 485, 490, 495, 10170, 10210, 10220, 10250, 10270, 10285, 30020, 30100, 30430, 30475, 30535, 30560, 30576)
+species_t5 = c(310, 406, 410, 420, 425, 435, 440, 445, 450, 455, 460, 471, 472, 475, 477, 480, 483, 485, 490, 495, 10170, 10210, 10220, 10250, 10270, 10285, 30020, 30100, 30430, 30475, 30535, 30560, 30576)
 
 # put 'em together
 species = c(species_t3, species_t5)
@@ -61,4 +61,21 @@ stock_name = "REBS"
 plot_restrat(index, species, stock_name)
 
 
+# example for pollock
+species = 21740
+stock_name = "Pollock"
 
+plot_restrat(index, species, stock_name)
+
+
+# example for northern rockfish
+species = 30420
+stock_name = "NRockfish"
+
+plot_restrat(index, species, stock_name)
+
+# example for POP
+species = 30060
+stock_name = "POP"
+
+plot_restrat(index, species, stock_name)
