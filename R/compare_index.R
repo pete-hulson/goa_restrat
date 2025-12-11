@@ -44,9 +44,9 @@ compare_index <- function(data = NULL,
   
   # flag if average computed differences > 0.1%
   compare %>% 
-    tidytable::filter(diff_biom > 0.01) -> biom_flag
+    tidytable::filter(abs(diff_biom) > 0.01) -> biom_flag
   compare %>% 
-    tidytable::filter(diff_popn > 0.01) -> popn_flag
+    tidytable::filter(abs(diff_popn) > 0.01) -> popn_flag
   
   # print message
   if(length(biom_flag$diff_biom) == 0 & length(popn_flag$diff_popn) == 0){
