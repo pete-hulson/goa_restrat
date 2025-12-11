@@ -19,7 +19,8 @@ restrat <- function(data = NULL,
   if(!dir.exists(here::here('data'))){
     dir.create(here::here('data'))
   }
-  # reclassify haul station locations ----
+  
+  # reclassify haul station locations for surveys prior to restratification ----
   
   if(isTRUE(run_terra)){
     ## import new stratum shapefile ----
@@ -42,6 +43,7 @@ restrat <- function(data = NULL,
     
     ## set up new haul data ----
     data$haul %>% 
+      tidytable::filter(year <= 2023) %>% 
       tidytable::rename(stratum_og = stratum) %>% 
       tidytable::left_join(haul_locs_new %>% 
                              dplyr::rename_all(tolower) %>% 
@@ -49,6 +51,10 @@ restrat <- function(data = NULL,
                                                hauljoin,
                                                area_km2_new = area_km2)) %>% 
       tidytable::drop_na() -> new_haul
+    
+    
+    ## spot to add the og stratification of 2025
+
     
     vroom::vroom_write(new_haul, here::here('data', 'new_haul.csv'), delim = ',')
   } else{new_haul <- vroom::vroom(here::here('data', 'new_haul.csv'), 
