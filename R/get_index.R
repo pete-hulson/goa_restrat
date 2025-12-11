@@ -17,6 +17,7 @@ get_index <- function(data = NULL,
   # prep survey data ----
   data$cpue %>% 
     tidytable::left_join(data$strata %>% 
+                           filter(data$strata$design_year >= 2024) %>%
                            tidytable::select(survey, stratum, area, area_id)) %>% 
     tidytable::mutate(subreg = case_when(area_id == 803 ~ 'Central GOA',
                                          area_id == 804 ~ 'Eastern GOA',
