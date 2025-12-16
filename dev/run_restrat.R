@@ -79,3 +79,9 @@ species = 30060
 stock_name = "POP"
 
 plot_restrat(index, species, stock_name)
+
+# example for ATF
+species = 10110
+stock_name = "Arrowtooth"
+
+plot_restrat(index, species, stock_name)
