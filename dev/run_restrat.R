@@ -5,6 +5,7 @@ library(tidyverse)
 library(vroom)
 library(here)
 library(afscdata)
+library(samplingbook)
 
 source_files <- list.files(here::here("R"), "*.R$")
 map(here::here("R", source_files), source)
