@@ -226,49 +226,81 @@ get_index_db <- function(data = NULL) {
   
 }
 
-#' Simulate Design-Based Index via Strategic Subsampling
+#' Simulate Biomass Index with Reduced Survey Effort
 #'
 #' @description
-#' This function performs a subsampling simulation to estimate the impact of 
-#' reduced sampling effort on survey indices. It supports two modes of 
-#' reduction: proportional (percentage-based) or fixed (count-based).
+#' This function simulates the impact of reduced sampling effort on survey-based 
+#' biomass estimates. It allows for proportional reductions at the stratum level 
+#' or global reductions redistributed proportionally across strata.
 #'
-#' @param data A \code{list} containing at least:
+#' @param data A list containing two elements: \code{cpue} (a data frame or tidytable 
+#'   with catch-per-unit-effort data) and \code{strata} (a data frame defining survey strata).
+#' @param hauls A reference data frame of hauls used for sampling when \code{test >= 1}.
+#' @param test A numeric value representing the reduction factor. If < 1, it represents 
+#'   the proportion of effort to remove (e.g., 0.2 removes 20%). If >= 1, it 
+#'   triggers an absolute sample size reduction.
+#' @param method An integer (1 or 2) defining the sampling strategy used when \code{test < 1}.
 #'   \itemize{
-#'     \item \code{cpue}: A \code{tidytable} of Catch Per Unit Effort data.
-#'     \item \code{strata}: A \code{tidytable} of stratum area definitions.
+#'     \item \code{1}: Proportional reduction applied independently within each stratum.
+#'     \item \code{2}: Global reduction calculated at the year level, then redistributed 
+#'           proportionally back into strata based on original haul density.
 #'   }
-#' @param hauls A \code{tidytable} or \code{data.frame} of station metadata used 
-#'   specifically for the fixed-count sampling mode.
-#' @param test A \code{numeric} value determining the sampling mode:
-#'   \itemize{
-#'     \item \code{test < 1}: Interpreted as a proportion. The function retains 
-#'     \code{(1 - test)} of stations within each year/stratum group.
-#'     \item \code{test >= 1}: Interpreted as a fixed count (\code{n}). The 
-#'     function retains exactly \code{test} stations per year.
-#'   }
+#'
+#' @return A tidytable summarized by \code{year} and \code{species_code} containing:
+#'   \item{biomass_mt}{Total estimated biomass in metric tons.}
+#'   \item{biomass_var}{Total variance of the biomass estimate.}
+#'   \item{population_count}{Total estimated population abundance.}
+#'   \item{population_var}{Total variance of the population estimate.}
 #'
 #' @details
-#' The function utilizes \code{tidytable::slice_sample} for high-performance 
-#' stratified sampling. In proportional mode, sampling is grouped by both 
-#' \code{year} and \code{stratum}. In fixed mode, sampling is grouped by 
-#' \code{year}. After subsampling, the design-based index is recalculated via 
-#' \code{get_index_db()} and aggregated.
+#' When \code{method = 2}, the function uses a nesting and mapping strategy to handle 
+#' dynamic sample sizes (\code{n}) per group, ensuring that the specific calculated 
+#' \code{samp_haul} for each stratum is respected.
 #' 
-#' @return A \code{tidytable} summarized by \code{year} and \code{species_code} 
-#' containing summed biomass, population counts, and their respective variances.
-#' 
+#' Note: If \code{samp_haul} exceeds the number of unique hauls available in a 
+#' stratum, \code{slice_sample} will return all available hauls (sampling without replacement).
+#'
 #' @export
+#' @import tidytable
+#' @importFrom purrr map2
 sim_db <- function(data, 
                    hauls,
-                   test){
+                   test,
+                   method){
   
   # reduce number of stations proportionally within a strata
   if(test < 1){
-    subcpue <- data$cpue %>%
-      tidytable::distinct(year, stratum, hauljoin) %>%
-      tidytable::slice_sample(prop = 1 - test, by = c(year, stratum)) %>%
-      tidytable::left_join(data$cpue)
+    
+    if(method == 1){
+      # method 1: sample based on proportion at strata level
+      subcpue <- data$cpue %>%
+        tidytable::distinct(year, stratum, hauljoin) %>%
+        tidytable::slice_sample(prop = 1 - test, 
+                                by = c(year, stratum)) %>%
+        tidytable::left_join(data$cpue)
+    }
+    
+    if(method == 2){
+      # method 2: reduce overall # of hauls by proportion, then distribute into strata
+      data$cpue %>%
+        tidytable::distinct(year, stratum, hauljoin) %>% 
+        tidytable::summarise(n_haul = .N,
+                             .by = c(year, stratum)) %>% 
+        tidytable::mutate(p_haul = n_haul / sum(n_haul),
+                          .by = year) %>% 
+        tidytable::mutate(samp_haul = round((1 - test) * sum(n_haul) * p_haul),
+                          .by = year) %>% 
+        tidytable::select(year, stratum, samp_haul) -> samp_haul_dat
+      
+      subcpue <- data$cpue %>%
+        tidytable::distinct(year, stratum, hauljoin) %>% 
+        tidytable::left_join(samp_haul_dat) %>% 
+        tidytable::nest(.by = c(year, stratum, samp_haul)) %>% 
+        tidytable::mutate(data = map2(data, samp_haul, ~ slice_sample(.x, n = .y))) %>% 
+        tidytable::unnest(data) %>%
+        tidytable::left_join(data$cpue)
+    }
+
     sub_data <- list(cpue = subcpue,
                      strata = data$strata)
   } else{

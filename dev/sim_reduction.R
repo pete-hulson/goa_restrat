@@ -37,7 +37,7 @@ if(isTRUE(run_query)){
 
 
 # define iterations
-iters = 500
+iters = 1000
 iters_vec <- set_names(1:iters, 1:iters)
 
 # run simulation  ----
@@ -47,10 +47,11 @@ names(test) <- test
 
 tictoc::tic() # Start timer
 res <- purrr::map_df(iters_vec, ~purrr::map_df(test, ~sim_db(data, 
-                                                                 hauls = data$cpue %>% 
-                                                                   tidytable::distinct(year, hauljoin) %>% 
-                                                                   tidytable::arrange(year), 
-                                                              test = .x), .id = 'subtest'),
+                                                             hauls = data$cpue %>% 
+                                                               tidytable::distinct(year, hauljoin) %>% 
+                                                               tidytable::arrange(year), 
+                                                             test = .x,
+                                                             method = 2), .id = 'subtest'),
                      .id = 'iteration',
                      .progress = list(type = "iterator", 
                                       format = "Resampling {cli::pb_bar} {cli::pb_percent}",
