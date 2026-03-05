@@ -1,0 +1,12 @@
+name: survey_comp_app
+title: survey_comp_app
+username: pete-hulson
+account: pete-hulson
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16818251
+bundleId: 11663930
+url: https://pete-hulson.shinyapps.io/survey_comp_app/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
