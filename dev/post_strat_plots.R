@@ -10,7 +10,7 @@ species_rebs = c(30050, 30051, 30052)
 species_dusky = c(30150, 30152)
 
 # tier 5 species codes
-species_t5 = c(30020, 30576)
+species_t5 = c(310, 30020, 30576)
 species_orox = c(30100, 30430, 30475, 30535, 30560)
 species_swf = c(10285, 10270, 10170, 10250, 10220, 10210)
 

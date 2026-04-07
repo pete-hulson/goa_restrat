@@ -1,11 +1,14 @@
+# to run this, first un-comment the setwd line, then comment it out again, save, and run (will throw error when trying ot publish)
+# setwd('C:/AA - PH Stuff/Projects/goa_restrat/survey_comp_app')
+
 library(tidytable)
 library(shiny)
 library(stringr)
 
 # 1. Setup - Let's assume your figures are in a folder named 'www/stocks'
 # It is best practice to put images in a 'www' subfolder for Shiny
-
-file_list <- list.files(file.path('www', 'stocks'), pattern = "\\.png$|\\.jpg$")
+file_list <- list.files(file.path('www', 'stocks'),
+                        pattern = "\\.png$|\\.jpg$")
 
 # Extract stock names from filenames
 stock_names <- str_remove(file_list, "_subreg_biom*\\.png$|_region*\\.png$") %>% 
@@ -65,7 +68,7 @@ server <- function(input, output, session) {
   # Function to find and render the image
   output$figure1 <- renderImage({
     # Build path relative to the app.R file
-    path <- file.path("www", "stocks", 
+    path <- file.path('www', 'stocks', 
                       paste0(gsub(input$stock_select, pattern = " ", replacement = "_"), 
                              "_region.png"))
     
@@ -76,7 +79,7 @@ server <- function(input, output, session) {
   
   output$figure2 <- renderImage({
     # Build path relative to the app.R file
-    path <- file.path("www", "stocks", 
+    path <- file.path('www', 'stocks', 
                       paste0(gsub(input$stock_select,
                                   pattern = " ", 
                                   replacement = "_"), 
