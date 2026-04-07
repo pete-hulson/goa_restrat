@@ -10,12 +10,13 @@ species_rebs = c(30050, 30051, 30052)
 species_dusky = c(30150, 30152)
 
 # tier 5 species codes
-species_t5 = c(310, 30020, 30576)
+species_t5 = c(310, 420, 440, 30020, 30576)
 species_orox = c(30100, 30430, 30475, 30535, 30560)
 species_swf = c(10285, 10270, 10170, 10250, 10220, 10210)
+species_skate = c(406, 410, 425, 435, 445, 450, 455, 460, 471, 472, 475, 477, 480, 483, 485, 490, 495)
 
 # put 'em together
-species = c(species_t3, species_t5, species_rebs, species_dusky, species_orox, species_swf)
+species = c(species_t3, species_t5, species_rebs, species_dusky, species_orox, species_swf, species_skate)
 
 # plot regional and subregional indices for stocks with single species code
 all_ests %>% 
@@ -109,12 +110,14 @@ for(i in 1:length(c(species_t3, species_t5))){
 complex_species <- list(species_rebs,
                         species_dusky,
                         species_orox,
-                        species_swf)
+                        species_swf,
+                        species_skate)
 
 complex_names <- c('Rougheye-Blackspotted rockfish',
                    'Dusky rockfish',
                    'Other rockfish',
-                   'Shallow-water flatfish')
+                   'Shallow-water flatfish',
+                   'Other skates')
 
 for(i in 1:length(complex_species)){
   
