@@ -305,13 +305,32 @@ sim_db <- function(data,
                      strata = data$strata)
   } else{
     # reduce number of stations overall based on total number of stations
-    slice_sample(hauls,
-                 n = n,
-                 by = year) %>% 
-      tidytable::left_join(data$cpue) -> subcpue
+    surveys = tidytable::summarise(hauls, n = .N, .by = year) %>% 
+      tidytable::filter(n >= test)
+    
+    # allocate to strata based on historical haul density, then sample within strata
+    data$cpue %>% 
+      tidytable::filter(year %in% surveys$year) %>%
+      tidytable::distinct(year, stratum, hauljoin) %>% 
+      tidytable::summarise(n_haul = .N,
+                           .by = c(year, stratum)) %>% 
+      tidytable::mutate(p_haul = n_haul / sum(n_haul),
+                        .by = year) %>% 
+      tidytable::mutate(samp_haul = round(p_haul * test, digits = 0)) %>% 
+        tidytable::select(year, stratum, samp_haul) -> samp_haul_dat
+    
+      subcpue <- data$cpue %>%
+        tidytable::distinct(year, stratum, hauljoin) %>% 
+        tidytable::left_join(samp_haul_dat) %>% 
+        tidytable::drop_na() %>%
+        tidytable::arrange(year) %>%
+        tidytable::nest(.by = c(year, stratum, samp_haul)) %>% 
+        tidytable::mutate(data = map2(data, samp_haul, ~ slice_sample(.x, n = .y))) %>% 
+        tidytable::unnest(data) %>%
+        tidytable::left_join(data$cpue)
     
     sub_data <- list(cpue = subcpue,
-                     strata = data$strata)
+          strata = data$strata)
   }
   
   # get new index

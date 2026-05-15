@@ -42,7 +42,7 @@ iters_vec <- set_names(1:iters, 1:iters)
 
 # run simulation  ----
 # define test vector (you can either use the total number of stations, or the proportion of stations to reduce)
-test <- c(0.1, 0.25, 0.5)
+test <- seq(200, 500, by = 50)
 names(test) <- test
 
 tictoc::tic() # Start timer
@@ -50,8 +50,7 @@ res <- purrr::map_df(iters_vec, ~purrr::map_df(test, ~sim_db(data,
                                                              hauls = data$cpue %>% 
                                                                tidytable::distinct(year, hauljoin) %>% 
                                                                tidytable::arrange(year), 
-                                                             test = .x,
-                                                             method = 2), .id = 'subtest'),
+                                                             test = .x), .id = 'subtest'),
                      .id = 'iteration',
                      .progress = list(type = "iterator", 
                                       format = "Resampling {cli::pb_bar} {cli::pb_percent}",
@@ -65,8 +64,7 @@ res <- purrr::map_df(iters_vec, ~purrr::map_df(test, ~sim_db(data,
                                               .by = c(year, species_code)))
 sim_time <- tictoc::toc(quiet = TRUE) # End timer
 
-
-(as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60
+paste("Run time", round((as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60 / 60, digits = 1), "hours")
 
 
 # get results ready for plotting
@@ -90,19 +88,17 @@ res %>%
   tidytable::mutate(perc_diff_biom = (biomass_mt - biomass_mt_og) / biomass_mt_og,
                     perc_diff_biom_var = (biomass_var - biomass_var_og) / biomass_var_og,
                     perc_diff_num = (population_count - population_count_og) / population_count_og,
-                    perc_diff_num_var = (population_var - population_var_og) / population_var_og) %>% 
-  tidytable::select(iteration, subtest, year, species_code, perc_diff_biom, perc_diff_biom_var, perc_diff_num, perc_diff_num_var) %>% 
+                    perc_diff_num_var = (population_var - population_var_og) / population_var_og,
+                  pos_biom = case_when(perc_diff_biom > 0 ~ 1,
+                  .default = 0)) %>% 
+  tidytable::select(iteration, subtest, year, species_code, perc_diff_biom, perc_diff_biom_var, perc_diff_num, perc_diff_num_var, pos_biom) %>% 
   tidytable::drop_na() %>% 
   # add species type
-  tidytable::mutate(species_type = case_when(species_code %in% flats ~ 'flatfish',
-                                             species_code %in% rox ~ 'rockfish',
-                                             species_code %in% gad ~ 'gadid'),
-                    subtest = case_when(subtest == test[1] & as.numeric(subtest) > 1 ~ paste(test[1], 'stations'),
-                                        subtest == test[2] & as.numeric(subtest) > 1 ~ paste(test[2], 'stations'),
-                                        subtest == test[3] & as.numeric(subtest) > 1 ~ paste(test[3], 'stations'),
-                                        subtest == test[1] & as.numeric(subtest) < 1 ~ paste0(100 * as.numeric(test[1]), '% station reduction'),
-                                        subtest == test[2] & as.numeric(subtest) < 1 ~ paste0(100 * as.numeric(test[2]), '% station reduction'),
-                                        subtest == test[3] & as.numeric(subtest) < 1 ~ paste0(100 * as.numeric(test[3]), '% station reduction'))) -> res_dat
+tidytable::mutate(species_type = case_when(species_code %in% flats ~ 'flatfish',
+species_code %in% rox ~ 'rockfish',
+species_code %in% gad ~ 'gadid'),
+subtest = forcats::fct_rev(subtest)) -> res_dat
+
 # get mean and median
 res_dat %>% 
   tidytable::summarise(mu_biom = mean(perc_diff_biom),
@@ -113,17 +109,24 @@ res_dat %>%
                        med_biom_var = median(perc_diff_biom_var),
                        med_num = median(perc_diff_num),
                        med_num_var = median(perc_diff_num_var),
-                       .by = c(species_type, subtest)) -> res_stats
+                       prob_pos = round(sum(pos_biom) / n(), digits = 2),
+                       .by = c(species_type, subtest)) %>%
+  tidytable::mutate(prob_neg = 1 - prob_pos,
+  prob_pos = scales::percent(prob_pos, accuracy = 1),
+  prob_neg = scales::percent(prob_neg, accuracy = 1)) -> res_stats
   
 # plot
 ggplot(res_dat, aes(x = perc_diff_biom, fill = species_type)) +
+  geom_vline(data = res_stats, aes(xintercept = med_biom), color = 'dark green', linewidth = 0.75) +
   geom_vline(xintercept = 0, linewidth = 1, linetype = 'dashed') +
   geom_histogram(aes(y = after_stat(density)), bins = 50, alpha = 0.77) +
   facet_grid(subtest ~ species_type, 
              scales = 'free_y') +
-  # geom_vline(data = res_stats, aes(xintercept = mu_biom), color = 'green', linewidth = 0.75) +
-  # geom_vline(data = res_stats, aes(xintercept = med_biom), color = 'orange', linewidth = 0.75) +
-  scale_x_continuous(labels = scales::label_percent()) +
+  geom_text(data = res_stats, aes(x = Inf, y = Inf, label = paste0("P(>0) = ", prob_pos)), 
+            color = 'black', size = 2.5, hjust = 1.2, vjust = 1.2, inherit.aes = FALSE) +
+  geom_text(data = res_stats, aes(x = -Inf, y = Inf, label = paste0("P(<0) = ", prob_neg)), 
+            color = 'black', size = 2.5, hjust = -0.2, vjust = 1.2, inherit.aes = FALSE) +
+  scale_x_continuous(labels = scales::label_percent(), limits = c(-2, 2)) +
   theme_bw(base_size = 14) +
   scico::scale_fill_scico_d(palette = 'roma') +
   labs(x = "% difference from original value", y = 'Density') +
