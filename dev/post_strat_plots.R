@@ -257,23 +257,23 @@ plot_dat %>%
     tidytable::mutate(Stock = "Dusky rockfish", tier = "Tier 3")) %>% 
   tidytable::bind_rows(plot_dat %>% 
     tidytable::filter(species_code %in% species_t5 & region == "GOA") %>% 
-    tidytable::mutate(tier = "Tier 5") %>% 
+    tidytable::mutate(tier = "Tier 4/5") %>% 
     tidytable::select(year, est_type, biomass_mt, Stock = common_name, tier)) %>% 
   tidytable::bind_rows(plot_dat %>% 
     tidytable::filter(species_code %in% species_orox & region == "GOA") %>% 
     tidytable::summarise(biomass_mt = sum(biomass_mt),
                          .by = c(year, est_type)) %>%
-    tidytable::mutate(Stock = "Other rockfish complex", tier = "Tier 5")) %>%
+    tidytable::mutate(Stock = "Other rockfish complex", tier = "Tier 4/5")) %>%
   tidytable::bind_rows(plot_dat %>% 
     tidytable::filter(species_code %in% species_swf & region == "GOA") %>% 
     tidytable::summarise(biomass_mt = sum(biomass_mt),
                          .by = c(year, est_type)) %>%
-    tidytable::mutate(Stock = "Shallow-water flatfish complex", tier = "Tier 5")) %>% 
+    tidytable::mutate(Stock = "Shallow-water flatfish complex", tier = "Tier 4/5")) %>% 
   tidytable::bind_rows(plot_dat %>% 
     tidytable::filter(species_code %in% species_skate & region == "GOA") %>% 
     tidytable::summarise(biomass_mt = sum(biomass_mt),
                          .by = c(year, est_type)) %>%
-    tidytable::mutate(Stock = "Other skate complex", tier = "Tier 5"))  %>% 
+    tidytable::mutate(Stock = "Other skate complex", tier = "Tier 4/5"))  %>% 
   tidytable::mutate(year = case_when(est_type == 'PS' ~ year - 0.25, .default = year),
                     biomass_mt = biomass_mt / 1000) %>% 
   tidytable::pivot_wider(names_from = est_type, values_from = biomass_mt) -> comp_dat
