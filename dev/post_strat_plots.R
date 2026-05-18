@@ -18,20 +18,38 @@ species_skate = c(406, 410, 425, 435, 445, 450, 455, 460, 471, 472, 475, 477, 48
 # put 'em together
 species = c(species_t3, species_t5, species_rebs, species_dusky, species_orox, species_swf, species_skate)
 
-# plot regional and subregional indices for stocks with single species code
+# get data ready for plotting
 all_ests %>% 
   dplyr::rename_all(tolower) %>% 
-  tidytable::filter(species_code %in% species) %>% 
-  tidytable::left_join(sp_names) -> plot_dat
+  tidytable::filter(species_code %in% species, year < 2025) %>% 
+  tidytable::mutate(year = case_when(est_type == 'PS' ~ year - 0.25, .default = year)) %>%
+  tidytable::pivot_wider(names_from = est_type, values_from = c(biomass_mt, biomass_lci, biomass_hci, population_count, population_lci, population_hci)) %>%
+  tidytable::drop_na() -> .data
 
+.data %>% 
+  tidytable::select(year, species_code, area_id, region, ends_with("ORIG")) %>% 
+  tidytable::mutate(est_type = 'ORIG') %>%
+  tidytable::rename_with(~gsub(x = ., pattern = "_ORIG", replacement = "")) %>% 
+  tidytable::bind_rows(.data %>% 
+    tidytable::select(year, species_code, area_id, region, ends_with("PS")) %>% 
+      tidytable::mutate(est_type = 'PS',
+                        year = year + 0.25) %>%
+      tidytable::rename_with(~gsub(x = ., pattern = "_PS", replacement = ""))) %>% 
+  tidytable::bind_rows(all_ests %>% 
+      dplyr::rename_all(tolower) %>% 
+      tidytable::filter(species_code %in% species & year == 2025)) %>%
+  tidytable::filter(biomass_mt > 0 & population_count > 0) %>%
+tidytable::left_join(sp_names) -> plot_dat
+
+# plot regional and subregional indices for stocks with single species code
 for(i in 1:length(c(species_t3, species_t5))){
-  
+
   # get plot data together
   ispp <- c(species_t3, species_t5)[i]
   dat <- plot_dat %>% 
-    tidytable::filter(region == 'GOA' & species_code == ispp)
+    tidytable::filter(region == 'GOA' & species_code == ispp & biomass_mt > 0 & population_count > 0)
   dat_subreg <- plot_dat %>% 
-    tidytable::filter(region != 'GOA' & species_code == ispp) %>% 
+    tidytable::filter(region != 'GOA' & species_code == ispp & biomass_mt > 0 & population_count > 0) %>% 
     tidytable::mutate(region = factor(region, levels = c("Western GOA", "Central GOA", "Eastern GOA")))
   stock_name <- paste0(first(dat$species_name), " (",first(dat$common_name), ")")
   comm_name <- first(dat$common_name)
@@ -217,4 +235,59 @@ for(i in 1:length(complex_species)){
          plot = biomass_subreg,
          width = 11, height = 7, units = "in")
 }
+
+
+# create plot comparing og to post-stratified estimates
+
+# set up data by tier and sotck/complex
+
+plot_dat %>% 
+  tidytable::filter(species_code %in% species_t3 & region == "GOA") %>% 
+  tidytable::mutate(tier = "Tier 3") %>% 
+  tidytable::select(year, est_type, biomass_mt, Stock = common_name, tier) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_rebs & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          .by = c(year, est_type)) %>%
+    tidytable::mutate(Stock = "Rougheye/Blacspotted complex", tier = "Tier 3")) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_dusky & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                     .by = c(year, est_type)) %>%
+    tidytable::mutate(Stock = "Dusky rockfish", tier = "Tier 3")) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_t5 & region == "GOA") %>% 
+    tidytable::mutate(tier = "Tier 5") %>% 
+    tidytable::select(year, est_type, biomass_mt, Stock = common_name, tier)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_orox & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                         .by = c(year, est_type)) %>%
+    tidytable::mutate(Stock = "Other rockfish complex", tier = "Tier 5")) %>%
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_swf & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                         .by = c(year, est_type)) %>%
+    tidytable::mutate(Stock = "Shallow-water flatfish complex", tier = "Tier 5")) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_skate & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                         .by = c(year, est_type)) %>%
+    tidytable::mutate(Stock = "Other skate complex", tier = "Tier 5"))  %>% 
+  tidytable::mutate(year = case_when(est_type == 'PS' ~ year - 0.25, .default = year),
+                    biomass_mt = biomass_mt / 1000) %>% 
+  tidytable::pivot_wider(names_from = est_type, values_from = biomass_mt) -> comp_dat
+
+ggplot(comp_dat, aes(x = ORIG, y = PS, color = Stock)) +
+  geom_point() +
+  facet_wrap(~tier, scales = "free", ncol = 1) +
+  geom_abline(slope = 1, intercept = 0, linetype = 'dashed') +
+  theme_bw(base_size = 14) +
+  labs(x = "Historical bottom trawl survey biomass (thousand mt)", y = "Post-stratified biomass (thousand mt)")
+
+ggsave(filename = "biom_comp.png",
+       path = here::here('plots'),
+       width = 8,
+       height = 8,
+       units = "in")
 
