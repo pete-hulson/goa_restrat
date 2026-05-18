@@ -1,4 +1,4 @@
-# to run this, first un-comment the setwd line, then comment it out again, save, and run (will throw error when trying ot publish)
+# to run this, first un-comment the setwd line, then comment it out again, save, and run (will throw error when trying to publish)
 # setwd('C:/AA - PH Stuff/Projects/goa_restrat/survey_comp_app')
 
 library(tidytable)
