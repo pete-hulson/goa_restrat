@@ -143,5 +143,5 @@ ggplot(plot_dat %>% filter(species_type != 'gadid'), aes(x = factor(year), y = B
 ggsave(filename = "perc_diff.png",
        path = here::here('plots'),
        width = 6.5,
-       height = 5,
+       height = 8,
        units = "in")
