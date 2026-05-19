@@ -13,3 +13,4 @@ data/species.csv
 data/strata.csv
 data/all_ests.csv
 plots/
+output/subsamp_res.rds
