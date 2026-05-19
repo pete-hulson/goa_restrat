@@ -10,7 +10,9 @@ data/goa_strata_2025.gpkg
 data/haul.csv
 data/index.csv
 data/species.csv
+data/species_names.csv
 data/strata.csv
 data/all_ests.csv
+data/data.rds
 plots/
 output/subsamp_res.rds
