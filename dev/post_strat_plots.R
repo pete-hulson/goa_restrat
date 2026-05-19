@@ -264,11 +264,11 @@ plot_dat %>%
     tidytable::summarise(biomass_mt = sum(biomass_mt),
                          .by = c(year, est_type)) %>%
     tidytable::mutate(Stock = "Other rockfish complex", tier = "Tier 4/5")) %>%
-  tidytable::bind_rows(plot_dat %>% 
-    tidytable::filter(species_code %in% species_swf & region == "GOA") %>% 
-    tidytable::summarise(biomass_mt = sum(biomass_mt),
-                         .by = c(year, est_type)) %>%
-    tidytable::mutate(Stock = "Shallow-water flatfish complex", tier = "Tier 4/5")) %>% 
+  # tidytable::bind_rows(plot_dat %>% 
+  #   tidytable::filter(species_code %in% species_swf & region == "GOA") %>% 
+  #   tidytable::summarise(biomass_mt = sum(biomass_mt),
+  #                        .by = c(year, est_type)) %>%
+  #   tidytable::mutate(Stock = "Shallow-water flatfish complex", tier = "Tier 4/5")) %>% 
   tidytable::bind_rows(plot_dat %>% 
     tidytable::filter(species_code %in% species_skate & region == "GOA") %>% 
     tidytable::summarise(biomass_mt = sum(biomass_mt),
@@ -276,14 +276,113 @@ plot_dat %>%
     tidytable::mutate(Stock = "Other skate complex", tier = "Tier 4/5"))  %>% 
   tidytable::mutate(year = case_when(est_type == 'PS' ~ year - 0.25, .default = year),
                     biomass_mt = biomass_mt / 1000) %>% 
-  tidytable::pivot_wider(names_from = est_type, values_from = biomass_mt) -> comp_dat
+  tidytable::pivot_wider(names_from = est_type, values_from = biomass_mt) %>% 
+  tidytable::left_join(# get lci
+plot_dat %>% 
+  tidytable::filter(species_code %in% species_t3 & region == "GOA") %>% 
+  tidytable::mutate(tier = "Tier 3") %>% 
+  tidytable::select(year, est_type, biomass_lci, Stock = common_name, tier) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_rebs & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                        biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                        .by = c(year, est_type)) %>%
+    tidytable::mutate(biomass_lci = biomass_mt - 1.96 * sqrt(biomass_var), Stock = "Rougheye/Blacspotted complex", tier = "Tier 3") %>% 
+    tidytable::select(-biomass_mt, -biomass_var)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_dusky & region == "GOA") %>% 
+      tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                          .by = c(year, est_type)) %>%
+      tidytable::mutate(biomass_lci = biomass_mt - 1.96 * sqrt(biomass_var), Stock = "Dusky rockfish", tier = "Tier 3") %>% 
+      tidytable::select(-biomass_mt, -biomass_var)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_t5 & region == "GOA") %>% 
+    tidytable::mutate(tier = "Tier 4/5") %>% 
+    tidytable::select(year, est_type, biomass_lci, Stock = common_name, tier)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_orox & region == "GOA") %>% 
+      tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                          .by = c(year, est_type)) %>%
+      tidytable::mutate(biomass_lci = biomass_mt - 1.96 * sqrt(biomass_var), Stock = "Other rockfish complex", tier = "Tier 4/5") %>% 
+      tidytable::select(-biomass_mt, -biomass_var)) %>%
+  # tidytable::bind_rows(plot_dat %>% 
+  #   tidytable::filter(species_code %in% species_swf & region == "GOA") %>% 
+  # tidytable::summarise(biomass_mt = sum(biomass_mt),
+  #                     biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+  #                     .by = c(year, est_type)) %>%
+  # tidytable::mutate(biomass_lci = biomass_mt - 1.96 * sqrt(biomass_var), Stock = "Shallow-water flatfish complex", tier = "Tier 4/5") %>% 
+  # tidytable::select(-biomass_mt, -biomass_var)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_skate & region == "GOA") %>% 
+      tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                          .by = c(year, est_type)) %>%
+      tidytable::mutate(biomass_lci = biomass_mt - 1.96 * sqrt(biomass_var), Stock = "Other skate complex", tier = "Tier 4/5") %>% 
+      tidytable::select(-biomass_mt, -biomass_var))  %>% 
+  tidytable::mutate(year = case_when(est_type == 'PS' ~ year - 0.25, .default = year),
+biomass_lci = biomass_lci / 1000) %>% 
+  tidytable::pivot_wider(names_from = est_type, values_from = biomass_lci) %>% 
+  tidytable::rename(ORIG_lci = ORIG, PS_lci = PS)) %>% 
+  tidytable::left_join(# get uci
+plot_dat %>% 
+  tidytable::filter(species_code %in% species_t3 & region == "GOA") %>% 
+  tidytable::mutate(tier = "Tier 3") %>% 
+  tidytable::select(year, est_type, biomass_hci, Stock = common_name, tier) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_rebs & region == "GOA") %>% 
+    tidytable::summarise(biomass_mt = sum(biomass_mt),
+                        biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                        .by = c(year, est_type)) %>%
+    tidytable::mutate(biomass_hci = biomass_mt + 1.96 * sqrt(biomass_var), Stock = "Rougheye/Blacspotted complex", tier = "Tier 3") %>% 
+    tidytable::select(-biomass_mt, -biomass_var)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_dusky & region == "GOA") %>% 
+      tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                          .by = c(year, est_type)) %>%
+      tidytable::mutate(biomass_hci = biomass_mt + 1.96 * sqrt(biomass_var), Stock = "Dusky rockfish", tier = "Tier 3") %>% 
+      tidytable::select(-biomass_mt, -biomass_var)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_t5 & region == "GOA") %>% 
+    tidytable::mutate(tier = "Tier 4/5") %>% 
+    tidytable::select(year, est_type, biomass_hci, Stock = common_name, tier)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_orox & region == "GOA") %>% 
+      tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                          .by = c(year, est_type)) %>%
+      tidytable::mutate(biomass_hci = biomass_mt + 1.96 * sqrt(biomass_var), Stock = "Other rockfish complex", tier = "Tier 4/5") %>% 
+      tidytable::select(-biomass_mt, -biomass_var)) %>%
+  # tidytable::bind_rows(plot_dat %>% 
+  #   tidytable::filter(species_code %in% species_swf & region == "GOA") %>% 
+  # tidytable::summarise(biomass_mt = sum(biomass_mt),
+  #                     biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+  #                     .by = c(year, est_type)) %>%
+  # tidytable::mutate(biomass_hci = biomass_mt - 1.96 * sqrt(biomass_var), Stock = "Shallow-water flatfish complex", tier = "Tier 4/5") %>% 
+  # tidytable::select(-biomass_mt, -biomass_var)) %>% 
+  tidytable::bind_rows(plot_dat %>% 
+    tidytable::filter(species_code %in% species_skate & region == "GOA") %>% 
+      tidytable::summarise(biomass_mt = sum(biomass_mt),
+                          biomass_var = sum(((biomass_hci - biomass_mt) / 1.96)^2),
+                          .by = c(year, est_type)) %>%
+      tidytable::mutate(biomass_hci = biomass_mt + 1.96 * sqrt(biomass_var), Stock = "Other skate complex", tier = "Tier 4/5") %>% 
+      tidytable::select(-biomass_mt, -biomass_var))  %>% 
+  tidytable::mutate(year = case_when(est_type == 'PS' ~ year - 0.25, .default = year),
+biomass_hci = biomass_hci / 1000) %>% 
+  tidytable::pivot_wider(names_from = est_type, values_from = biomass_hci) %>% 
+  tidytable::rename(ORIG_uci = ORIG, PS_uci = PS)) -> comp_dat
 
 ggplot(comp_dat, aes(x = ORIG, y = PS, color = Stock)) +
   geom_point() +
+  geom_errorbar(aes(ymin = PS_lci, ymax = PS_uci), width = 0.2, alpha = 0.3) +
+  geom_errorbarh(aes(xmin = ORIG_lci, xmax = ORIG_uci), height = 0.2, alpha = 0.3) +
   facet_wrap(~tier, scales = "free", ncol = 1) +
   geom_abline(slope = 1, intercept = 0, linetype = 'dashed') +
   theme_bw(base_size = 14) +
-  labs(x = "Historical bottom trawl survey biomass (thousand mt)", y = "Post-stratified biomass (thousand mt)")
+  labs(x = "Historical bottom trawl survey biomass (thousand mt)", y = "Post-stratified biomass (thousand mt)") +
+  scico::scale_color_scico_d(palette = 'roma')
 
 ggsave(filename = "biom_comp.png",
        path = here::here('plots'),
