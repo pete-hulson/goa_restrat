@@ -37,7 +37,9 @@ query_data <- function(species,
                   stratum,
                   hauljoin,
                   latitude_dd_start,
+                  latitude_dd_end,
                   longitude_dd_start,
+                  longitude_dd_end,
                   cpue_nokm2,
                   cpue_kgkm2) %>% 
     dplyr::filter(survey_definition_id == 47,
@@ -51,7 +53,9 @@ query_data <- function(species,
                   numcpue = cpue_nokm2,
                   wtcpue = cpue_kgkm2,
                   lat_st = latitude_dd_start,
-                  long_st = longitude_dd_start) %>% 
+                  lat_end = latitude_dd_end,
+                  long_st = longitude_dd_start,
+                  long_end = longitude_dd_end) %>% 
     dplyr::collect() -> cpue
   
   # get gap_products catch
@@ -102,7 +106,6 @@ query_data <- function(species,
                        delim = ',') -> cpue
   
   # strata data ----
-  
   cat(paste0("pulling strata...\n"))
   
   # strata with area sizes
@@ -157,18 +160,14 @@ query_data <- function(species,
                   stratum,
                   hauljoin,
                   latitude_dd_start,
-                  longitude_dd_start) %>% 
+                  latitude_dd_end,
+                  longitude_dd_start,
+                  longitude_dd_end) %>% 
     dplyr::filter(survey_definition_id == 47) %>% 
-    dplyr::select(year,
-                  survey = survey_definition_id,
-                  stratum,
-                  hauljoin,
-                  lat_st = latitude_dd_start,
-                  long_st = longitude_dd_start) %>% 
     dplyr::collect() %>% 
     vroom::vroom_write(here::here('data', "haul.csv"), 
                        delim = ',') -> haul
-  
+
   # computed index data ----
   
   cat(paste0("pulling index data...\n"))

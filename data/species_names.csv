@@ -1,4 +1,12 @@
 species_code,species_name,common_name
+20510,Anoplopoma fimbria,sablefish
+10170,Parophrys vetulus,English sole
+10180,Microstomus pacificus,Dover sole
+10200,Glyptocephalus zachirus,rex sole
+10210,Limanda aspera,yellowfin sole
+10220,Platichthys stellatus,starry flounder
+10250,Psettichthys melanostictus,sand sole
+10261,Lepidopsetta polyxystra,northern rock sole
 310,Squalus suckleyi,spiny dogfish
 406,Bathyraja spinosissima,white skate
 410,Bathyraja abyssicola,deepsea skate
@@ -21,26 +29,19 @@ species_code,species_name,common_name
 495,Bathyraja violacea,Okhotsk skate
 10110,Atheresthes stomias,arrowtooth flounder
 10130,Hippoglossoides elassodon,flathead sole
-20510,Anoplopoma fimbria,sablefish
-10170,Parophrys vetulus,English sole
-10180,Microstomus pacificus,Dover sole
-10200,Glyptocephalus zachirus,rex sole
-10210,Limanda aspera,yellowfin sole
-10220,Platichthys stellatus,starry flounder
-10250,Psettichthys melanostictus,sand sole
-10261,Lepidopsetta polyxystra,northern rock sole
+21740,Gadus chalcogrammus,walleye pollock
+21230,Albatrossia pectoralis,giant grenadier
 10262,Lepidopsetta bilineata,southern rock sole
 10270,Isopsetta isolepis,butter sole
 10285,Pleuronectes quadrituberculatus,Alaska plaice
 21720,Gadus macrocephalus,Pacific cod
-21740,Gadus chalcogrammus,walleye pollock
-30420,Sebastes polyspinis,northern rockfish
-30430,Sebastes proriger,redstripe rockfish
-30475,Sebastes babcocki,redbanded rockfish
 30535,Sebastes variegatus,harlequin rockfish
 30560,Sebastes zacentrus,sharpchin rockfish
 30576,Sebastes borealis,shortraker rockfish
 30020,Sebastolobus alascanus,shortspine thornyhead
+30420,Sebastes polyspinis,northern rockfish
+30430,Sebastes proriger,redstripe rockfish
+30475,Sebastes babcocki,redbanded rockfish
 30050,NA,rougheye and blackspotted rockfish unid.
 30051,Sebastes aleutianus,rougheye rockfish
 30052,Sebastes melanostictus,blackspotted rockfish
