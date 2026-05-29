@@ -390,3 +390,34 @@ ggsave(filename = "biom_comp.png",
        height = 8,
        units = "in")
 
+# plot mean length for tier 3 stocks ----
+# run survey data query
+if(!file.exists(here::here('data', 'data.rds'))){
+  data <- query_data(spp_codes, pull_comp = TRUE)
+} else{data <- readRDS(here::here('data', 'data.rds'))}
+
+
+data$lpop %>% 
+  tidytable::filter(species_code %in% species_t3) %>% 
+  tidytable::mutate(mean_len = sum(length * num) / sum(num), .by = c(year, species_code)) %>% 
+  tidytable::mutate(var = num * (length - mean_len)^2) %>% 
+  tidytable::summarise(mean_length_cm = first(mean_len), sd_length = sqrt(sum(var) / sum(num)), .by = c(year, species_code)) %>% 
+  tidytable::mutate(tier = "Tier 3") %>%
+  tidytable::left_join(sp_names) -> .dat
+  
+ggplot(.dat, aes(x = year, y = mean_length_cm, color = common_name)) +
+  geom_line(linewidth = 0.75, linetype = "dashed") +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean_length_cm - 1.96 * sd_length, ymax = mean_length_cm + 1.96 * sd_length), width = 0.2, alpha = 0.3) +
+    geom_point(data = .dat %>% tidytable::filter(year == 2025), size = 2, color = "black") +
+  facet_wrap(~common_name, ncol = 2) +
+  theme_bw(base_size = 14) +
+  theme(legend.position = "none") +
+  labs(x = "Year", y = "Mean length (cm)") +
+  scico::scale_color_scico_d(palette = 'roma')
+
+ggsave(filename = "len_comp.png",
+       path = here::here('plots'),
+       width = 6,
+       height = 8,
+       units = "in")

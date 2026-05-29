@@ -199,6 +199,34 @@ query_data <- function(species,
   
   
   if(isTRUE(pull_comp)){
+
+    # length pop'n data ----
+    cat("\u231b", crayon::blue("working on trawl survey length pop'n query..."), "\n")
+    dplyr::tbl(conn, dplyr::sql('gap_products.akfin_sizecomp')) %>% 
+      dplyr::rename_all(tolower) %>% 
+      dplyr::select(year,
+                    survey_definition_id,
+                    area_id,
+                    species_code,
+                    length_mm,
+                    sex,
+                    population_count) %>% 
+      dplyr::filter(year <= new_year,
+                    survey_definition_id == 47,
+                    species_code %in% species,
+                    area_id %in% c(99903)) %>% 
+      dplyr::select(year,
+                    survey = survey_definition_id, 
+                    strata = area_id, 
+                    species_code,
+                    length = length_mm, 
+                    sex,
+                    num = population_count) %>%     
+    dplyr::collect() %>% 
+      tidytable::filter(length > 0) %>% 
+      tidytable::mutate(length = length / 10) %>% 
+      vroom::vroom_write(., here::here('data', "lpop.csv"), delim = ",") -> lpop
+    
     # length frequency data ----
     
     cat(paste0("pulling length frequency...\n"))
@@ -277,7 +305,8 @@ query_data <- function(species,
   DBI::dbDisconnect(conn)
   cat("finished.\n")
   if(isTRUE(pull_comp)){
-    data = list(lfreq = tidytable::as_tidytable(lfreq),
+    data = list(lpop = tidytable::as_tidytable(lpop),
+                lfreq = tidytable::as_tidytable(lfreq),
                 specimen = tidytable::as_tidytable(specimen),
                 cpue = tidytable::as_tidytable(cpue),
                 strata = tidytable::as_tidytable(strata),
