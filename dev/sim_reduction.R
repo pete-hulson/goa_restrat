@@ -3,6 +3,8 @@
 # load libraries
 library(tidyverse)
 library(tictoc)
+library(survey)
+library(akgfmaps)
 
 # source functions
 source_files <- list.files(here::here("R"), "*.R$")
@@ -30,14 +32,16 @@ flats = c(10110, 10130, 10180, 10285, 10270, 10170, 10250, 10220, 10210, 10261, 
 rox = c(30060, 30420, 30050, 30051, 30052, 30150, 30152, 30020, 30576, 30100, 30430, 30475, 30535, 30560)
 gad = c(21720, 21740)
 
-# run query
+# get data (if desired, run query)
 if(isTRUE(run_query)){
   data <- query_data(species)
 } else{data <- readRDS(here::here('data', 'data.rds'))}
 
+# Import historical (DESIGN_YEAR 2024) and new (DESIGN_YEAR 2025) GOA strata
+goa_strata_2025 <- akgfmaps::get_base_layers(select.region = "goa", design.year = 2025, set.crs = "EPSG:4326")$survey.strata
 
 # define iterations
-iters = 1000
+iters = 2
 iters_vec <- set_names(1:iters, 1:iters)
 
 # run simulation  ----
@@ -46,25 +50,44 @@ test <- seq(200, 500, by = 50)
 names(test) <- test
 
 tictoc::tic() # Start timer
-res <- purrr::map_df(iters_vec, ~purrr::map_df(test, ~sim_db(data, 
-                                                             hauls = data$cpue %>% 
-                                                               tidytable::distinct(year, hauljoin) %>% 
-                                                               tidytable::arrange(year), 
-                                                             test = .x), .id = 'subtest'),
-                     .id = 'iteration',
-                     .progress = list(type = "iterator", 
-                                      format = "Resampling {cli::pb_bar} {cli::pb_percent}",
-                                      clear = TRUE)) %>% 
+res <- purrr::map_df(
+  iters_vec, 
+  ~purrr::map_df(
+    test, 
+    ~sim_db(
+      data, 
+      hauls = data$cpue %>% 
+        tidytable::distinct(year, hauljoin) %>% 
+        tidytable::arrange(year), 
+      test = .x,
+      goa_strata_2025), .id = 'subtest'),
+    .id = 'iteration',
+    .progress = list(type = "iterator", 
+                     format = "Resampling {cli::pb_bar} {cli::pb_percent}",
+                     clear = TRUE)) %>% 
   tidytable::left_join(get_index_db(data) %>% 
-                         tidytable::drop_na() %>% 
-                         tidytable::summarise(biomass_mt_og = sum(biomass_mt),
-                                              biomass_var_og = sum(biomass_var),
-                                              population_count_og = sum(population_count),
-                                              population_var_og = sum(population_var),
-                                              .by = c(year, species_code)))
+  tidytable::drop_na() %>% 
+  tidytable::summarise(biomass_mt_og = sum(biomass_mt),
+                      biomass_var_og = sum(biomass_var),
+                      population_count_og = sum(population_count),
+                      population_var_og = sum(population_var),
+                      .by = c(year, species_code)) %>% 
+  tidytable::mutate(est_type = case_when(year < 2025 ~ "Historical",
+                                           year == 2025 ~ "2025")) %>% 
+    tidytable::bind_rows(get_index_ps(data, goa_strata_2025) %>% 
+      tidytable::filter(year < 2025) %>% 
+        tidytable::drop_na() %>% 
+        tidytable::summarise(biomass_mt_og = sum(biomass_mt),
+                             biomass_var_og = sum(biomass_var),
+                             population_count_og = sum(population_count),
+                             population_var_og = sum(population_var),
+                             .by = c(year, species_code))  %>% 
+        tidytable::mutate(est_type = "Post-stratified")))
+
 sim_time <- tictoc::toc(quiet = TRUE) # End timer
 
 paste("Run time", round((as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60 / 60, digits = 1), "hours")
 
 # write out results
 saveRDS(res, here::here('output', 'subsamp_res.rds'))
+
