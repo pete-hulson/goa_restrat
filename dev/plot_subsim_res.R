@@ -27,6 +27,11 @@ flats = c(10110, 10130, 10180, 10285, 10270, 10170, 10250, 10220, 10210, 10261, 
 rox = c(30060, 30420, 30050, 30051, 30052, 30150, 30152, 30020, 30576, 30100, 30430, 30475, 30535, 30560)
 gad = c(21720, 21740)
 
+
+res %>% 
+  filter(species_code == 10110, year == 1993)
+
+
 ## plot distribution of percent difference
 # get results ready for plotting
 res %>%  
@@ -52,7 +57,7 @@ res %>%
                     perc_diff_num_var = (population_var - population_var_og) / population_var_og,
                   pos_biom = case_when(perc_diff_biom > 0 ~ 1,
                   .default = 0)) %>% 
-  tidytable::select(iteration, subtest, year, species_code, perc_diff_biom, perc_diff_biom_var, perc_diff_num, perc_diff_num_var, pos_biom) %>% 
+  tidytable::select(iteration, subtest, year, species_code, est_type, perc_diff_biom, perc_diff_biom_var, perc_diff_num, perc_diff_num_var, pos_biom) %>% 
   tidytable::drop_na() %>% 
   # add species type
 tidytable::mutate(species_type = case_when(species_code %in% flats ~ 'flatfish',
@@ -71,14 +76,52 @@ res_dat %>%
                        med_num = median(perc_diff_num),
                        med_num_var = median(perc_diff_num_var),
                        prob_pos = round(sum(pos_biom) / n(), digits = 2),
-                       .by = c(species_type, subtest)) %>%
+                       .by = c(species_type, subtest, est_type)) %>%
   tidytable::mutate(prob_neg = 1 - prob_pos,
   prob_pos = scales::percent(prob_pos, accuracy = 1),
   prob_neg = scales::percent(prob_neg, accuracy = 1)) -> res_stats
   
 # plot
-ggplot(res_dat, aes(x = perc_diff_biom, fill = species_type)) +
-  geom_vline(data = res_stats, aes(xintercept = med_biom), color = 'dark green', linewidth = 0.75) +
+ggplot(res_dat %>% tidytable::filter(est_type == "Historical"), aes(x = perc_diff_biom, fill = species_type)) +
+  geom_vline(data = res_stats %>% tidytable::filter(est_type == "Historical"), aes(xintercept = med_biom), color = 'dark green', linewidth = 0.75) +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = 'dashed') +
+  geom_histogram(aes(y = after_stat(density)), bins = 50, alpha = 0.77) +
+  facet_grid(subtest ~ species_type, 
+             scales = 'free_y') +
+  # geom_text(data = res_stats, aes(x = Inf, y = Inf, label = paste0("P(>0) = ", prob_pos)), 
+  #           color = 'black', size = 2.5, hjust = 1.2, vjust = 1.2, inherit.aes = FALSE) +
+  # geom_text(data = res_stats, aes(x = -Inf, y = Inf, label = paste0("P(<0) = ", prob_neg)), 
+  #           color = 'black', size = 2.5, hjust = -0.2, vjust = 1.2, inherit.aes = FALSE) +
+  scale_x_continuous(labels = scales::label_percent(), limits = c(-2, 2)) +
+  theme_bw(base_size = 14) +
+  scico::scale_fill_scico_d(palette = 'roma') +
+  labs(x = "% difference from original value", y = 'Density') +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        legend.position = 'none',
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+ggplot(res_dat %>% tidytable::filter(est_type == "Post-stratified"), aes(x = perc_diff_biom, fill = species_type)) +
+  geom_vline(data = res_stats %>% tidytable::filter(est_type == "Post-stratified"), aes(xintercept = med_biom), color = 'dark green', linewidth = 0.75) +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = 'dashed') +
+  geom_histogram(aes(y = after_stat(density)), bins = 50, alpha = 0.77) +
+  facet_grid(subtest ~ species_type, 
+             scales = 'free_y') +
+  # geom_text(data = res_stats, aes(x = Inf, y = Inf, label = paste0("P(>0) = ", prob_pos)), 
+  #           color = 'black', size = 2.5, hjust = 1.2, vjust = 1.2, inherit.aes = FALSE) +
+  # geom_text(data = res_stats, aes(x = -Inf, y = Inf, label = paste0("P(<0) = ", prob_neg)), 
+  #           color = 'black', size = 2.5, hjust = -0.2, vjust = 1.2, inherit.aes = FALSE) +
+  scale_x_continuous(labels = scales::label_percent(), limits = c(-2, 2)) +
+  theme_bw(base_size = 14) +
+  scico::scale_fill_scico_d(palette = 'roma') +
+  labs(x = "% difference from original value", y = 'Density') +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        legend.position = 'none',
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+ggplot(res_dat %>% tidytable::filter(est_type == "2025"), aes(x = perc_diff_biom, fill = species_type)) +
+  geom_vline(data = res_stats %>% tidytable::filter(est_type == "2025"), aes(xintercept = med_biom), color = 'dark green', linewidth = 0.75) +
   geom_vline(xintercept = 0, linewidth = 1, linetype = 'dashed') +
   geom_histogram(aes(y = after_stat(density)), bins = 50, alpha = 0.77) +
   facet_grid(subtest ~ species_type, 

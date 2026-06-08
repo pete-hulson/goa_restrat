@@ -84,165 +84,119 @@ get_index_db <- function(data = NULL) {
                                          area_id == 805 ~ 'Western GOA')) %>% 
     # select columns
     tidytable::select(year, species_code, stratum, area_id, subreg, biomass_mt, biomass_var, population_count, population_var) -> db_index
-
+  
   # output return
   db_index
   
 }
 
-#' Post-Stratify Historical Survey Data to a New Spatial Stratification Grid
+#' Perform Post-Stratification on Survey Data
 #'
 #' @description
-#' Spatially reassigns historical survey haul stations (pre-2025) into a new 
-#' 2025 stratum framework using geographic intersection. It then constructs a 
-#' population area frequency framework and map-iterates over species-year 
-#' combinations to compute post-stratified abundance indices.
+#' This function performs a post-stratification analysis on catch-per-unit-effort (CPUE) 
+#' data using the 2025 stratification design. It extracts the 2025 stratum area configurations, 
+#' identifies all unique combinations of species and years present in the dataset, and 
+#' maps over them to calculate restratified index values.
 #'
-#' @param data A named \code{list} containing at least two data frames or tidytables:
-#'   \itemize{
-#'     \item \code{haul}: Historical haul metadata containing \code{year}, 
-#'           \code{latitude_dd_start}, \code{latitude_dd_end}, \code{longitude_dd_start}, 
-#'           \code{longitude_dd_end}, and \code{survey_definition_id}.
-#'     \item \code{strata}: Stratum metadata containing columns \code{design_year}, 
-#'           \code{stratum}, and \code{area}.
-#'     \item \code{cpue}: Catch-per-unit-effort data containing at least \code{species_code} 
-#'           and \code{year} used to build the iterative estimation grid.
-#'   }
-#'   Defaults to \code{NULL}.
-#' @param goa_strata_2025 An \code{sf} (simple features) spatial object representing the 
-#'   updated 2025 Gulf of Alaska (GOA) stratification grid. Must include a \code{STRATUM} 
-#'   attribute column matching the spatial geometries.
+#' @param data A named list containing at least two data frames or tidytables: 
+#'   `strata` (containing columns `design_year`, `stratum`, and `area`) and 
+#'   `cpue` (containing columns `species_code` and `year`). Defaults to `NULL`.
+#' @param goa_stations_hist Data object containing historical station allocation or location data 
+#'   passed directly to the underlying \code{\code{\link{restratify}}} function.
 #'
-#' @details
-#' The function processes through three main procedural steps:
-#' \enumerate{
-#'   \item \strong{Spatial Overlay:} Filters hauls up to the year 2023, calculates 
-#'         midpoint coordinates for each haul sequence, converts them into spatial 
-#'         points (\code{EPSG:4326}), and runs a geometric intersection (\code{sf::st_intersection}) 
-#'         against the 2025 strata boundaries. This explicitly assigns historical hauls to a \code{STRATUM_NEW} label.
-#'   \item \strong{Area Frequency Setup:} Creates a reference frame (\code{new_strata_areas}) 
-#'         mapping the 2025 strata IDs to their total spatial area sizes (\code{Freq}), 
-#'         which is required for survey post-stratification expansion weights.
-#'   \item \strong{Mapping Execution:} Generates a unique cross-grid of all \code{species_code} 
-#'         and \code{year} records inside the CPUE dataset and iteratively processes them 
-#'         using \code{purrr::pmap_dfr()} via a sub-function called \code{restratify()}.
-#' }
+#' @return A \code{tidytable} (or data frame) containing the combined post-stratified index results 
+#'   across all species and years, generated iteratively by \code{\code{\link{restratify}}}.
 #'
-#' @return A \code{tidytable} or data frame combining row-bound results across all 
-#'   mapped species and years returned by the underlying \code{restratify()} function.
-#'
-#' @importFrom tidytable filter mutate select rename tidytable distinct
-#' @importFrom sf st_as_sf st_intersection
-#' @importFrom purrr pmap_dfr
-#' 
-#' @note 
-#' This function relies closely on an external or unexported helper function 
-#' named \code{restratify(data, goa_stations_hist, ispp, iyear)}. Ensure that this 
-#' function is loaded in your active workspace environment.
-#' 
 #' @export
+#'
+#' @importFrom tidytable tidytable distinct
+#' @importFrom purrr pmap_dfr
 #'
 #' @examples
 #' \dontrun{
-#' # Assuming 'survey_list' matches required structures and 'goa_sf' is an sf polygon layer
-#' ps_index <- get_index_ps(data = survey_list, goa_strata_2025 = goa_sf)
+#' # Example usage:
+#' index_results <- get_index_ps(
+#'   data = survey_data_list,
+#'   goa_stations_hist = historical_stations
+#' )
 #' }
-get_index_ps <- function(data = NULL, goa_strata_2025){
-
-  # reassign stations pre-2025 to the new 2025 strata
-  goa_stations_hist <- data$haul %>% 
-    tidytable::filter(year <= 2023) %>% 
-    tidytable::mutate(lat = (latitude_dd_start + latitude_dd_end) / 2,
-                      lon = (longitude_dd_start + longitude_dd_end) / 2) %>%
-    tidytable::select(-c(survey_definition_id, latitude_dd_start, latitude_dd_end, longitude_dd_start, longitude_dd_end)) %>% 
-    sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326") %>% 
-    sf::st_intersection(y = goa_strata_2025[, c("STRATUM")]) %>% 
-    tidytable::rename(STRATUM_NEW = STRATUM)
-
+get_index_ps <- function(data = NULL, goa_stations_hist){
+  
   # perform post-stratification
   new_strata_areas <- tidytable::tidytable(STRATUM_NEW = data$strata[design_year == 2025]$stratum,
-    Freq = data$strata[design_year == 2025]$area)
-
+                                           Freq = data$strata[design_year == 2025]$area)
+  
   run_grid <- data$cpue %>% 
     tidytable::distinct(species_code, year)
-
+  
   purrr::pmap_dfr(run_grid, ~restratify(data, goa_stations_hist, new_strata_areas, ispp = ..1, iyear = ..2))
-
+  
 }
 
-#' Core Post-Stratification Worker for a Single Species-Year Combination
+
+#' Restratify Survey Data and Calculate Post-Stratified Index Estimates
 #'
 #' @description
-#' Sub-wrapper function called dynamically within a loop or mapping function 
-#' (e.g., \code{purrr::pmap_dfr}) to calculate post-stratified survey totals 
-#' (biomass and population abundance) and variances for a unique species 
-#' and year intersection.
-#'
-#' @param data A named \code{list} containing at least two data frames or tidytables:
-#'   \itemize{
-#'     \item \code{cpue}: Catch-per-unit-effort data frame containing \code{species_code}, 
-#'           \code{year}, \code{hauljoin}, \code{stratum}, \code{wtcpue}, and \code{numcpue}.
-#'     \item \code{strata}: Historical stratum metadata containing columns \code{design_year}, 
-#'           \code{stratum}, and \code{area}.
-#'   }
-#' @param goa_stations_hist A spatial overlay data frame or spatial object linking historic 
-#'   trawl hauls to new management frameworks. It must contain the key columns \code{hauljoin} 
-#'   and \code{STRATUM_NEW}.
-#' @param new_strata_areas A data frame or tidytable tracking the modern stratification 
-#'   sizes, containing at least \code{STRATUM_NEW} and \code{Freq} (representing stratum areas).
-#' @param ispp An \code{integer} or \code{numeric} code representing the target species filter.
-#' @param iyear An \code{integer} representing the target survey year filter.
+#' This function takes survey catch-per-unit-effort (CPUE) data for a single species and year, 
+#' maps it from historical strata configurations into a new 2025 stratification schema, handles 
+#' singleton strata via statistical imputation, and calculates post-stratified biomass and 
+#' population count estimates with their corresponding variances using the \code{survey} package.
 #'
 #' @details
-#' The calculation workflow includes the following steps:
+#' The function executes the following sequence:
 #' \enumerate{
-#'   \item \strong{Subsetting & Validation:} Filters CPUE data down to the \code{ispp}/\code{iyear} combo. 
-#'         If no records exist or if total weight catch is exactly zero, the function safely exits and returns \code{NULL}.
-#'   \item \strong{Multi-way Joins:} Links the filtered catch data with the new spatial stratum tracking 
-#'         (\code{goa_stations_hist}), the legacy 1984 stratum area sizes (used for Finite Population Correction \code{fpc}), 
-#'         and the passed population stratification size frequencies (\code{new_strata_areas}).
-#'   \item \strong{Singleton Stratum Imputation:} A vital statistical step. If an active old or new stratum 
-#'         contains only a single station (sample size $n=1$), variance calculation mathematically drops. 
-#'         The function flags these "singletons" and duplicates them via a \code{bind_rows()} copy step to force an 
-#'         artificial sample size calculation threshold.
-#'   \item \strong{Survey Design Compilation:} Initializes a baseline \code{survey::svydesign()} tracking 
-#'         historical strata, and updates it into a post-stratified framework using \code{survey::postStratify()} 
-#'         mapped against the new stratum configurations.
-#'   \item \strong{Aggregation:} Runs standard \code{survey::svyby(..., FUN = svytotal)} expansions for both 
-#'         \code{wtcpue} and \code{numcpue}, groups totals across the geographic area, converts units (Weight to Metric Tons), 
-#'         and flattens the result into a clean summary.
+#'   \item \textbf{Filtering:} Subsets CPUE data to the specified species and year, keeping valid non-negative data.
+#'   \item \textbf{Data Joining:} Pairs historical hauls with the new stratum IDs (\code{STRATUM_NEW}), filters baseline stratum definitions from 2024, and pairs them with 2025 areas.
+#'   \item \textbf{Singleton Imputation:} Identifies strata (old or new) containing only a single station (a "singleton"). It duplicates these stations into the dataset as a proxy mechanism to ensure the \code{survey} package has sufficient degrees of freedom to calculate variance without crashing.
+#'   \item \textbf{Survey Estimation:} Constructs an original \code{\code{\link[survey]{svydesign}}}, projects it via \code{\code{\link[survey]{postStratify}}} onto the new 2025 population areas, and extracts weighted total calculations via \code{\code{\link[survey]{svyby}}}.
+#'   \item \textbf{Regional Aggregation:} Groups the calculated metrics into structural operational areas of interest (Eastern GOA, Central GOA, Western GOA, and an overall GOA total).
 #' }
 #'
-#' @return A \code{tidytable} with a single row corresponding to the post-stratified (\code{est_type = "PS"}) 
-#'   biomass estimate, variance, population count, and population count variance for the evaluated 
-#'   species and year. Returns \code{NULL} (or an empty expression) if zero rows or zero total catches are met.
-#' 
-#' @note 
-#' Ensure that you explicitly update the \code{FUN = svytotal} calls within this function to 
-#' \code{FUN = survey::svytotal} unless the \code{survey} library namespace is loaded globally 
-#' into your R session environment via \code{library(survey)}.
+#' @param data A named list containing at least:
+#'   \itemize{
+#'     \item \code{cpue}: A data frame/tidytable with columns \code{species_code}, \code{year}, \code{numcpue}, \code{wtcpue}, \code{hauljoin}, and \code{stratum}.
+#'     \item \code{strata}: A data frame/tidytable with columns \code{design_year}, \code{stratum}, \code{area}, and \code{area_id}.
+#'   }
+#' @param goa_stations_hist A data frame or matrix mapping historical hauls to new stratum boundaries. Must contain columns \code{hauljoin} and \code{STRATUM_NEW}.
+#' @param new_strata_areas A data frame or tidytable defining target population weights for post-stratification. Must contain columns \code{STRATUM_NEW} and \code{Freq}.
+#' @param ispp Numeric or Character. The target species code to filter and analyze.
+#' @param iyear Numeric. The target calendar year to filter and analyze.
 #'
-#' @importFrom tidytable filter select left_join drop_na bind_rows summarise mutate
-#' @importFrom survey svydesign postStratify svyby
-#' 
+#' @return A \code{tidytable} containing aggregated post-stratified metrics for the specified species and year across regional areas. Columns include:
+#'   \itemize{
+#'     \item \code{year}: The evaluated iteration year (\code{iyear}).
+#'     \item \code{species_code}: The evaluated iteration species (\code{ispp}).
+#'     \item \code{area_id}: Character labels indicating regional breakdowns (\code{"Eastern GOA"}, \code{"Central GOA"}, \code{"Western GOA"}, or \code{"GOA"}).
+#'     \item \code{biomass_mt}: Estimated biomass in metric tons.
+#'     \item \code{biomass_var}: Variance of the biomass estimate.
+#'     \item \code{population_count}: Estimated population abundance count.
+#'     \item \code{population_var}: Variance of the population count estimate.
+#'   }
+#'   Returns \code{NULL} implicitly if no records or zero biomass are found for the given combination.
+#'
 #' @export
+#' 
+#' @importFrom tidytable filter select left_join drop_na summarise mutate case_when bind_rows
+#' @importFrom survey svydesign postStratify svyby svytotal
 #'
-#' @seealso \code{\link{get_index_ps}}
 restratify <- function(data, goa_stations_hist, new_strata_areas, ispp, iyear){
-
+  
   # filter to species and year of interest, and join to new strata
   cod <- data$cpue %>% 
-      tidytable::filter(species_code == ispp, year == iyear, !is.na(numcpue)) %>% 
-      tidytable::select(hauljoin, year, species_code, stratum, wtcpue, numcpue)
-    
+    tidytable::filter(species_code == ispp, year == iyear, !is.na(numcpue)) %>% 
+    tidytable::select(hauljoin, year, species_code, stratum, wtcpue, numcpue) %>% 
+    tidytable::filter(wtcpue >= 0,
+                      numcpue >= 0)
+  
   if (nrow(cod) == 0) return()
   
   cod2 <- cod %>% 
-      tidytable::left_join(goa_stations_hist[, c("hauljoin", "STRATUM_NEW")], by = "hauljoin") %>% 
-      tidytable::left_join(data$strata[design_year == 1984, c("stratum", "area")], by = "stratum") %>% 
-      tidytable::left_join(new_strata_areas, by = "STRATUM_NEW") %>% 
-      tidytable::drop_na()
-
+    tidytable::left_join(as.data.frame(goa_stations_hist)[, c("hauljoin", "STRATUM")], by = "hauljoin") %>% 
+    tidytable::rename(STRATUM_NEW = STRATUM) %>% 
+    tidytable::left_join(data$strata[design_year == 2024, c("stratum", "area")], by = "stratum") %>% 
+    tidytable::left_join(new_strata_areas, by = "STRATUM_NEW") %>% 
+    tidytable::drop_na()
+  
   if (sum(cod2$wtcpue) == 0) return()
   
   ## Impute stations where stratum effort is 1
@@ -250,123 +204,143 @@ restratify <- function(data, goa_stations_hist, new_strata_areas, ispp, iyear){
   singleton_old_strata <- which(table(cod2$stratum) == 1) %>% names() %>% as.numeric()
   cod2 <- cod2 %>% 
     tidytable::bind_rows(cod2 %>% 
-      tidytable::filter(STRATUM_NEW %in% singleton_new_strata | stratum %in% singleton_old_strata))
+                           tidytable::filter(STRATUM_NEW %in% singleton_new_strata | stratum %in% singleton_old_strata))
 
   # filter out strata with no stations (after imputation)
   new_strata_areas_real <- new_strata_areas %>% 
     tidytable::left_join(cod2 %>% 
-      tidytable::summarise(n = .N, .by = STRATUM_NEW)) %>% 
+                           tidytable::summarise(n = .N, .by = STRATUM_NEW)) %>% 
     tidytable::drop_na() %>%
     tidytable::select(-n)
-
+  
   # define survey design object with original stratification
   orig_design <- survey::svydesign(
     id = ~1,
     strata = ~stratum,
     data = cod2,
     fpc = ~area)
-    
+  
   # define post-stratified survey design object with new stratification and new stratum areas as population sizes
   post_design <- survey::postStratify(
     design = orig_design,
     strata = ~STRATUM_NEW,
     population = new_strata_areas_real,
     partial = TRUE)
+
+  # Calculate post-stratified index estimates with variances
+  stratum_biom <- survey::svyby(formula = ~wtcpue,          
+                by = ~STRATUM_NEW,        
+                design = post_design,     
+                FUN = svytotal) %>% 
+    tidytable::mutate(
+      stratum = STRATUM_NEW,
+      biomass_mt = wtcpue * 0.001,
+      biomass_var = se^2 * 1e-6) %>% 
+    tidytable::select(stratum, biomass_mt, biomass_var)
   
-  # Calculate post-stratified total biomass estimates with variances
-  survey::svyby(formula = ~wtcpue,          
-    by = ~STRATUM_NEW,        
-    design = post_design,     
-    FUN = svytotal) %>% 
-  tidytable::mutate(
-    stratum = STRATUM_NEW,
-    biomass_mt = wtcpue * 0.001,
-    biomass_var = se^2 * 1e-6) %>% 
-  tidytable::select(stratum, biomass_mt, biomass_var) %>% 
-  tidytable::summarise(
-    biomass_mt = sum(biomass_mt, na.rm = TRUE),
-    biomass_var = sum(biomass_var, na.rm = TRUE)) %>% 
-  tidytable::mutate(
-    year = iyear,
-    species_code = ispp) %>% 
-  tidytable::left_join(
-    survey::svyby(formula = ~numcpue,          
-      by = ~STRATUM_NEW,        
-      design = post_design,     
-      FUN = svytotal) %>% 
+  stratum_num <- survey::svyby(formula = ~numcpue,          
+                               by = ~STRATUM_NEW,        
+                               design = post_design,     
+                               FUN = svytotal) %>% 
     tidytable::mutate(
       stratum = STRATUM_NEW,
       population_count = numcpue,
       population_var = se^2) %>% 
-    tidytable::select(stratum, population_count, population_var) %>% 
+    tidytable::select(stratum, population_count, population_var)
+  
+  # summarize by goa areas
+  stratum_biom %>% 
+    tidytable::left_join(data$strata %>% 
+                           tidytable::filter(design_year == 2025)) %>% 
     tidytable::summarise(
-      population_count = sum(population_count, na.rm = TRUE),
-      population_var = sum(population_var, na.rm = TRUE)) %>% 
+      biomass_mt = sum(biomass_mt, na.rm = TRUE),
+      biomass_var = sum(biomass_var, na.rm = TRUE),
+      .by = area_id) %>% 
+    tidytable::mutate(subreg = tidytable::case_when(area_id == 803 ~ "Eastern GOA",
+                                                     area_id == 804 ~ "Central GOA",
+                                                     area_id == 805 ~ "Western GOA")) %>% 
+    tidytable::bind_rows(stratum_biom %>% 
+                           tidytable::summarise(
+                             biomass_mt = sum(biomass_mt, na.rm = TRUE),
+                             biomass_var = sum(biomass_var, na.rm = TRUE)) %>% 
+                           tidytable::mutate(area_id = 99903, subreg = "GOA")) %>% 
+    tidytable::left_join(stratum_num %>% 
+                           tidytable::left_join(data$strata %>% 
+                                                  tidytable::filter(design_year == 2025)) %>% 
+                           tidytable::summarise(
+                             population_count = sum(population_count, na.rm = TRUE),
+                             population_var = sum(population_var, na.rm = TRUE),
+                             .by = area_id) %>% 
+                           tidytable::mutate(subreg = tidytable::case_when(area_id == 803 ~ "Eastern GOA",
+                                                                            area_id == 804 ~ "Central GOA",
+                                                                            area_id == 805 ~ "Western GOA")) %>% 
+                           tidytable::bind_rows(stratum_num %>% 
+                                                  tidytable::summarise(
+                                                    population_count = sum(population_count, na.rm = TRUE),
+                                                    population_var = sum(population_var, na.rm = TRUE)) %>% 
+                                                  tidytable::mutate(area_id = 99903, subreg = "GOA"))) %>% 
     tidytable::mutate(
       year = iyear,
-      species_code = ispp)) %>% 
-  tidytable::select(year, species_code, biomass_mt, biomass_var, population_count, population_var)
-  
+      species_code = ispp) %>% 
+    tidytable::select(year, species_code, area_id, subreg, biomass_mt, biomass_var, population_count, population_var)
+
 }
 
-#' Simulate Design-Based and Post-Stratified Performance Under Reduced Sampling Effort
+#' Simulate Survey Index Under Reduced Sampling Scenarios
 #'
 #' @description
-#' Runs a survey design simulation by subsampling historical survey stations down to a 
-#' fixed target sample size. Stations are allocated across strata proportionally based on 
-#' historical sampling density, and a randomized draw without replacement is executed. 
-#' The function then calculates and compares total biomass/abundance indices using 
-#' both historical design-based (\code{get_index_db}) and updated post-stratified (\code{get_index_ps}) methods.
-#'
-#' @param data A named \code{list} containing the complete baseline survey datasets:
-#'   \itemize{
-#'     \item \code{cpue}: Catch-per-unit-effort data frame containing at least \code{year}, \code{stratum}, \code{hauljoin}, and catch metrics.
-#'     \item \code{haul}: Complete haul metadata table containing at least \code{year} and \code{hauljoin}.
-#'     \item \code{strata}: Baseline stratum metadata table.
-#'   }
-#' @param hauls A data frame or tidytable tracking total historical stations per year, containing at least \code{year}.
-#' @param test An \code{integer} specifying the target total number of sampling stations to simulate across the entire survey area for a given year.
-#' @param goa_strata_2025 An \code{sf} (simple features) spatial object containing the updated 2025 spatial stratification grid (passed directly to \code{get_index_ps}).
+#' This function simulates a reduced-effort fisheries survey design. It sub-samples historical 
+#' and 2025 survey hauls down to a target effort threshold (\code{test}) using proportional 
+#' allocation across strata. It then calculates and returns comparative index estimates 
+#' using baseline design-based, post-stratified, and updated 2025 estimation methods.
 #'
 #' @details
-#' The simulation algorithm processes through the following steps:
+#' The simulation follows a structured process:
 #' \enumerate{
-#'   \item \strong{Year Selection:} Filters out any survey years where the total historical station count in \code{hauls} was less than the target \code{test} size.
-#'   \item \strong{Proportional Allocation:} Calculates the baseline historical distribution of stations across strata (\code{p_haul}) within each valid year. It multiplies this probability by \code{test} and rounds to the nearest integer to derive a target sample size (\code{samp_haul}) per stratum.
-#'   \item \strong{Stratified Random Subsampling:} Nests the haul identifiers by year and stratum, and utilizes \code{purrr::map2()} alongside \code{slice_sample()} to randomly select \code{samp_haul} stations without replacement.
-#'   \item \strong{Data Slicing:} Subsets the master \code{cpue} and \code{haul} tables down to only include the randomly selected \code{hauljoin} identifiers.
-#'   \item \strong{Index Generation:} 
-#'     \itemize{
-#'       \item Computes design-based estimates via \code{get_index_db()}, aggregating local stratum values to total annual estimates (\code{est_type = 'Historical'}).
-#'       \item Computes post-stratified estimates via \code{get_index_ps()}, modeling performance against the new spatial layers (\code{est_type = 'Post-stratified'}).
-#'     }
+#'   \item \textbf{Survey Filtering:} Keeps only the survey years where the absolute number of historical hauls meets or exceeds the \code{test} sample size threshold.
+#'   \item \textbf{Proportional Allocation:} Calculates the historical distribution of haul density (\code{p_haul}) across strata within each year, and allocates the target \code{test} number of hauls to each stratum using this ratio.
+#'   \item \textbf{Stratified Sub-sampling:} Groups and nests the CPUE data, applying \code{\code{\link[purrr]{map2}}} and \code{\code{\link[tidytable]{slice_sample}}} to randomly draw the allocated number of hauls without replacement.
+#'   \item \textbf{Data Splitting:} Generates partitioned sub-sampled datasets separating historical years (\code{< 2025}) from the target evaluation year (\code{== 2025}).
+#'   \item \textbf{Index Evaluation:} Computes three distinct population indices from the sub-sampled data for comparison: Design-Based Historical, Post-Stratified Historical, and Design-Based 2025.
 #' }
 #'
-#' @return A \code{tidytable} combining both estimation approaches with columns:
-#'   \item{year}{Simulation survey year}
-#'   \item{species_code}{Unique code representing the species}
-#'   \item{biomass_mt}{Total simulated biomass estimate in Metric Tons}
-#'   \item{biomass_var}{Total variance of the simulated biomass estimate}
-#'   \item{population_count}{Total simulated population abundance estimate}
-#'   \item{population_var}{Total variance of the simulated abundance estimate}
-#'   \item{est_type}{Label indicating estimation framework: \code{'Historical'} or \code{'Post-stratified'}}
+#' @param data A named list containing master biological and survey design datasets:
+#'   \itemize{
+#'     \item \code{cpue}: Data frame/tidytable containing columns \code{year}, \code{stratum}, \code{hauljoin}, and species catch metrics.
+#'     \item \code{haul}: Data frame/tidytable containing baseline environmental/station haul info.
+#'     \item \code{strata}: Data frame/tidytable defining stratum population metrics.
+#'   }
+#' @param hauls A data frame/tidytable containing station metadata used to calculate the baseline annual haul effort via counts (\code{.N}).
+#' @param test Integer. The total target number of stations (hauls) to down-sample the annual survey to.
+#' @param goa_stations_hist Data object passed directly to \code{\code{\link{get_index_ps}}} to handle post-stratification geometry mapping.
 #'
-#' @importFrom tidytable summarise filter distinct mutate select left_join drop_na arrange nest unnest bind_rows
-#' @importFrom purrr map2
-#' @importFrom dplyr slice_sample
-#' 
+#' @return A \code{tidytable} containing combined, aggregated index estimations for all sub-sampled parameters. Columns include:
+#'   \itemize{
+#'     \item \code{year}: The survey calendar year.
+#'     \item \code{species_code}: The taxonomic identifier for the species.
+#'     \item \code{area_id}: Regional identifier label (included if returning from \code{get_index_ps}).
+#'     \item \code{biomass_mt}: Summed biomass estimate in metric tons.
+#'     \item \code{biomass_var}: Summed variance of the biomass estimate.
+#'     \item \code{population_count}: Summed numerical abundance estimate.
+#'     \item \code{population_var}: Summed variance of the abundance estimate.
+#'     \item \code{est_type}: Character flag denoting the calculation framework (\code{"Historical"}, \code{"Post-stratified"}, or \code{"2025"}).
+#'   }
+#'
 #' @export
 #'
-#' @seealso \code{\link{get_index_db}}, \code{\link{get_index_ps}}
+#' @importFrom tidytable summarise filter distinct mutate select left_join drop_na arrange nest unnest bind_rows case_when
+#' @importFrom purrr map2
+#' @importFrom dplyr slice_sample
+#'
 sim_db <- function(data, 
                    hauls,
                    test,
-                   goa_strata_2025){
+                   goa_stations_hist){
   
   # reduce number of stations overall based on total number of stations
   surveys = tidytable::summarise(hauls, n = .N, .by = year) %>% 
     tidytable::filter(n >= test)
-    
+  
   # allocate to strata based on historical haul density, then sample within strata
   samp_haul_dat <- data$cpue %>% 
     tidytable::filter(year %in% surveys$year) %>%
@@ -377,7 +351,7 @@ sim_db <- function(data,
                       .by = year) %>% 
     tidytable::mutate(samp_haul = round(p_haul * test, digits = 0)) %>% 
     tidytable::select(year, stratum, samp_haul)
-    
+  
   subcpue <- data$cpue %>%
     tidytable::distinct(year, stratum, hauljoin) %>% 
     tidytable::left_join(samp_haul_dat) %>% 
@@ -395,7 +369,7 @@ sim_db <- function(data,
         tidytable::mutate(selected = 1)) %>%
     tidytable::filter(selected == 1) %>%
     tidytable::select(-selected)
-
+  
   sub_data_pre <- list(
     cpue = subcpue %>% tidytable::filter(year < 2025),
     haul = subhaul %>% tidytable::filter(year < 2025),
@@ -413,19 +387,35 @@ sim_db <- function(data,
                          biomass_var = sum(biomass_var),
                          population_count = sum(population_count),
                          population_var = sum(population_var),
-                         .by = c(year, species_code)) %>% 
+                         .by = c(year, species_code, area_id, subreg)) %>% 
+    tidytable::bind_rows(get_index_db(sub_data_pre) %>% # historical index with reduced stations
+                           tidytable::drop_na() %>% 
+                           tidytable::summarise(biomass_mt = sum(biomass_mt),
+                                                biomass_var = sum(biomass_var),
+                                                population_count = sum(population_count),
+                                                population_var = sum(population_var),
+                                                .by = c(year, species_code)) %>% 
+                           tidytable::mutate(area_id = 99903, subreg = "GOA")) %>% 
     tidytable::mutate(est_type = 'Historical') %>% 
-    tidytable::bind_rows(get_index_ps(sub_data_pre, goa_strata_2025) %>% # post-stratified index with reduced stations
-      tidytable::mutate(est_type = 'Post-stratified')) %>% 
-    tidytable::bind_rows(get_index_db(sub_data_25) %>% # 2025 index with reduced stations
-      tidytable::drop_na() %>% 
-      tidytable::summarise(biomass_mt = sum(biomass_mt),
-                           biomass_var = sum(biomass_var),
-                           population_count = sum(population_count),
-                           population_var = sum(population_var),
-                           .by = c(year, species_code)) %>% 
-      tidytable::mutate(est_type = '2025'))
-
+    tidytable::bind_rows(get_index_ps(sub_data_pre, goa_stations_hist) %>% # post-stratified index with reduced stations
+                           tidytable::mutate(est_type = 'Post-stratified')) %>% 
+    tidytable::bind_rows(get_index_db(sub_data_25) %>% # historical index with reduced stations
+                           tidytable::drop_na() %>% 
+                           tidytable::summarise(biomass_mt = sum(biomass_mt),
+                                                biomass_var = sum(biomass_var),
+                                                population_count = sum(population_count),
+                                                population_var = sum(population_var),
+                                                .by = c(year, species_code, area_id, subreg)) %>% 
+                           tidytable::bind_rows(get_index_db(sub_data_25) %>% # historical index with reduced stations
+                                                  tidytable::drop_na() %>% 
+                                                  tidytable::summarise(biomass_mt = sum(biomass_mt),
+                                                                       biomass_var = sum(biomass_var),
+                                                                       population_count = sum(population_count),
+                                                                       population_var = sum(population_var),
+                                                                       .by = c(year, species_code)) %>% 
+                                                  tidytable::mutate(area_id = 99903, subreg = "GOA")) %>% 
+                           tidytable::mutate(est_type = '2025'))
+  
   # return
   sub_index
 }
@@ -469,7 +459,7 @@ get_cmplx_index <- function(data, species){
                          biomass_var_og = sum(biomass_var_og),
                          population_count_og = sum(population_count_og),
                          population_var_og = sum(population_var_og),
-                         .by = c(iteration, subtest, year)) %>% 
+                         .by = c(iteration, subtest, year, est_type)) %>% 
     tidytable::mutate(species_code = species[1])
 }
 

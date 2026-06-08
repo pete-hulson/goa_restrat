@@ -37,8 +37,17 @@ if(isTRUE(run_query)){
   data <- query_data(species)
 } else{data <- readRDS(here::here('data', 'data.rds'))}
 
-# Import historical (DESIGN_YEAR 2024) and new (DESIGN_YEAR 2025) GOA strata
+# Import GOA strata
 goa_strata_2025 <- akgfmaps::get_base_layers(select.region = "goa", design.year = 2025, set.crs = "EPSG:4326")$survey.strata
+
+# reassign stations pre-2025 to the new 2025 strata
+goa_stations_hist <- data$haul %>% 
+  tidytable::filter(year <= 2023) %>% 
+  tidytable::mutate(lat = (latitude_dd_start + latitude_dd_end) / 2,
+                    lon = (longitude_dd_start + longitude_dd_end) / 2) %>%
+  tidytable::select(c(hauljoin, year, lat, lon)) %>% 
+  sf::st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326") %>% 
+  sf::st_intersection(y = goa_strata_2025[, c("STRATUM")])
 
 # define iterations
 iters = 2
@@ -60,33 +69,42 @@ res <- purrr::map_df(
         tidytable::distinct(year, hauljoin) %>% 
         tidytable::arrange(year), 
       test = .x,
-      goa_strata_2025), .id = 'subtest'),
-    .id = 'iteration',
-    .progress = list(type = "iterator", 
-                     format = "Resampling {cli::pb_bar} {cli::pb_percent}",
-                     clear = TRUE)) %>% 
+      goa_stations_hist), .id = 'subtest'),
+  .id = 'iteration',
+  .progress = list(type = "iterator", 
+                   format = "Resampling {cli::pb_bar} {cli::pb_percent}",
+                   clear = TRUE)) %>% 
   tidytable::left_join(get_index_db(data) %>% 
-  tidytable::drop_na() %>% 
-  tidytable::summarise(biomass_mt_og = sum(biomass_mt),
-                      biomass_var_og = sum(biomass_var),
-                      population_count_og = sum(population_count),
-                      population_var_og = sum(population_var),
-                      .by = c(year, species_code)) %>% 
-  tidytable::mutate(est_type = case_when(year < 2025 ~ "Historical",
-                                           year == 2025 ~ "2025")) %>% 
-    tidytable::bind_rows(get_index_ps(data, goa_strata_2025) %>% 
-      tidytable::filter(year < 2025) %>% 
-        tidytable::drop_na() %>% 
-        tidytable::summarise(biomass_mt_og = sum(biomass_mt),
-                             biomass_var_og = sum(biomass_var),
-                             population_count_og = sum(population_count),
-                             population_var_og = sum(population_var),
-                             .by = c(year, species_code))  %>% 
-        tidytable::mutate(est_type = "Post-stratified")))
+                         tidytable::drop_na() %>% 
+                         tidytable::summarise(biomass_mt_og = sum(biomass_mt),
+                                              biomass_var_og = sum(biomass_var),
+                                              population_count_og = sum(population_count),
+                                              population_var_og = sum(population_var),
+                                              .by = c(year, species_code, area_id, subreg)) %>% 
+                         tidytable::mutate(est_type = case_when(year < 2025 ~ "Historical",
+                                                                year == 2025 ~ "2025")) %>% 
+                         tidytable::bind_rows(get_index_db(data) %>% 
+                                                tidytable::drop_na() %>% 
+                                                tidytable::summarise(biomass_mt_og = sum(biomass_mt),
+                                                                     biomass_var_og = sum(biomass_var),
+                                                                     population_count_og = sum(population_count),
+                                                                     population_var_og = sum(population_var),
+                                                                     .by = c(year, species_code)) %>% 
+                                                tidytable::mutate(est_type = case_when(year < 2025 ~ "Historical",
+                                                                                       year == 2025 ~ "2025"),
+                                                                  area_id = 99903, subreg = "GOA")) %>% 
+                         tidytable::bind_rows(get_index_ps(data, goa_stations_hist) %>% 
+                                                tidytable::filter(year < 2025) %>% 
+                                                tidytable::drop_na() %>% 
+                                                tidytable::rename(biomass_mt_og = biomass_mt,
+                                                                  biomass_var_og = biomass_var,
+                                                                  population_count_og = population_count,
+                                                                  population_var_og = population_var)  %>% 
+                                                tidytable::mutate(est_type = "Post-stratified")))
 
 sim_time <- tictoc::toc(quiet = TRUE) # End timer
 
-paste("Run time", round((as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60 / 60, digits = 1), "hours")
+paste("Run time", round((as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60 / 60, digits = 1), "hours for 500 iterations")
 
 # write out results
 saveRDS(res, here::here('output', 'subsamp_res.rds'))

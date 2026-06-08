@@ -44,7 +44,9 @@ query_data <- function(species,
                   cpue_kgkm2) %>% 
     dplyr::filter(survey_definition_id == 47,
                   species_code %in% species,
-                  year >= 1990) %>% 
+                  year >= 1990,
+                  cpue_nokm2 >= 0,
+                  cpue_kgkm2 >= 0) %>% 
     dplyr::select(year,
                   species_code,
                   stratum,
