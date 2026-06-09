@@ -4,4 +4,4 @@
 .Ruserdata
 data/
 plots/
-output/subsamp_res.rds
+output/subsamp_*

@@ -5,14 +5,15 @@ library(tidyverse)
 library(tictoc)
 library(survey)
 library(akgfmaps)
+library(parallel)
+library(foreach)
+library(doParallel)
 
 # source functions
 source_files <- list.files(here::here("R"), "*.R$")
 map(here::here("R", source_files), source)
 
 # query data ----
-# query data? - if first time running, or if data.rds file not in data folder, you will need to change this to TRUE
-run_query = FALSE
 
 # tier 3 species codes
 species_t3 = c(10110, 10130, 10180, 21720, 21740, 30060, 30420, 10261, 10262, 10200)
@@ -33,7 +34,10 @@ rox = c(30060, 30420, 30050, 30051, 30052, 30150, 30152, 30020, 30576, 30100, 30
 gad = c(21720, 21740)
 
 # get data (if desired, run query)
-if(isTRUE(run_query)){
+if(!dir.exists(here::here('data'))){
+  dir.create(here::here('data'), recursive = TRUE)
+}
+if(!file.exists(here::here('data', 'data.rds'))){
   data <- query_data(species)
 } else{data <- readRDS(here::here('data', 'data.rds'))}
 
@@ -54,58 +58,77 @@ iters = 2
 iters_vec <- set_names(1:iters, 1:iters)
 
 # run simulation  ----
-# define test vector (you can either use the total number of stations, or the proportion of stations to reduce)
-test <- seq(200, 500, by = 50)
-names(test) <- test
 
+# define test vector of the total number of stations
+tests <- seq(200, 500, by = 50)
+names(tests) <- tests
+
+# get the number of available cores
+num_cores <- parallel::detectCores()
+if(num_cores > length(tests)) num_cores = length(tests)
+
+# set the number of cores to be used for parallel computing
+doParallel::registerDoParallel(cores = num_cores)
+
+# run tests in parallel
 tictoc::tic() # Start timer
-res <- purrr::map_df(
-  iters_vec, 
-  ~purrr::map_df(
-    test, 
+foreach::foreach(test = tests, 
+                 .packages = c("tidyverse", "survey"),
+                 .export = c("restratify")) %dopar% {
+  res <- purrr::map_df(
+    iters_vec, 
     ~sim_db(
       data, 
       hauls = data$cpue %>% 
         tidytable::distinct(year, hauljoin) %>% 
         tidytable::arrange(year), 
-      test = .x,
-      goa_stations_hist), .id = 'subtest'),
-  .id = 'iteration',
-  .progress = list(type = "iterator", 
-                   format = "Resampling {cli::pb_bar} {cli::pb_percent}",
-                   clear = TRUE)) %>% 
+      test = test,
+      goa_stations_hist),
+  .id = 'iteration')
+  
+  # write out results
+  saveRDS(res, here::here('output', paste0('subsamp_', test, '.rds')))
+}
+sim_time <- tictoc::toc(quiet = TRUE) # End timer
+
+# compile all results and estimate original values
+res <- purrr::map_df(tests,
+                     ~readRDS(here::here('output', paste0('subsamp_', .x, '.rds'))),
+                     .id = 'subtest') %>% 
   tidytable::left_join(get_index_db(data) %>% 
-                         tidytable::drop_na() %>% 
+                         tidytable::drop_na() %>%
                          tidytable::summarise(biomass_mt_og = sum(biomass_mt),
                                               biomass_var_og = sum(biomass_var),
                                               population_count_og = sum(population_count),
                                               population_var_og = sum(population_var),
-                                              .by = c(year, species_code, area_id, subreg)) %>% 
+                                              .by = c(year, species_code, area_id, subreg)) %>%
                          tidytable::mutate(est_type = case_when(year < 2025 ~ "Historical",
-                                                                year == 2025 ~ "2025")) %>% 
-                         tidytable::bind_rows(get_index_db(data) %>% 
-                                                tidytable::drop_na() %>% 
+                                                                year == 2025 ~ "2025")) %>%
+                         tidytable::bind_rows(get_index_db(data) %>%
+                                                tidytable::drop_na() %>%
                                                 tidytable::summarise(biomass_mt_og = sum(biomass_mt),
                                                                      biomass_var_og = sum(biomass_var),
                                                                      population_count_og = sum(population_count),
                                                                      population_var_og = sum(population_var),
-                                                                     .by = c(year, species_code)) %>% 
+                                                                     .by = c(year, species_code)) %>%
                                                 tidytable::mutate(est_type = case_when(year < 2025 ~ "Historical",
                                                                                        year == 2025 ~ "2025"),
-                                                                  area_id = 99903, subreg = "GOA")) %>% 
-                         tidytable::bind_rows(get_index_ps(data, goa_stations_hist) %>% 
-                                                tidytable::filter(year < 2025) %>% 
-                                                tidytable::drop_na() %>% 
+                                                                  area_id = 99903, subreg = "GOA")) %>%
+                         tidytable::bind_rows(get_index_ps(data, goa_stations_hist) %>%
+                                                tidytable::filter(year < 2025) %>%
+                                                tidytable::drop_na() %>%
                                                 tidytable::rename(biomass_mt_og = biomass_mt,
                                                                   biomass_var_og = biomass_var,
                                                                   population_count_og = population_count,
-                                                                  population_var_og = population_var)  %>% 
+                                                                  population_var_og = population_var)  %>%
                                                 tidytable::mutate(est_type = "Post-stratified")))
 
-sim_time <- tictoc::toc(quiet = TRUE) # End timer
-
-paste("Run time", round((as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60 / 60, digits = 1), "hours for 500 iterations")
 
 # write out results
 saveRDS(res, here::here('output', 'subsamp_res.rds'))
+
+# write out total time to run simulation
+paste("Run time", round((as.numeric(strsplit(sim_time$callback_msg, split = " ")[[1]][1]) / iters) * 500 / 60 / 60, digits = 1), "hours for 500 iterations")
+
+
 
