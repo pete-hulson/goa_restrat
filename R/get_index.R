@@ -459,7 +459,7 @@ get_cmplx_index <- function(data, species){
                          biomass_var_og = sum(biomass_var_og),
                          population_count_og = sum(population_count_og),
                          population_var_og = sum(population_var_og),
-                         .by = c(iteration, subtest, year, est_type)) %>% 
+                         .by = c(iteration, subtest, year, est_type, area_id, subreg)) %>% 
     tidytable::mutate(species_code = species[1])
 }
 
